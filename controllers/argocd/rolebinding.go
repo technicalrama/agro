@@ -58,7 +58,7 @@ func newRoleBinding(cr *argoprojv1a1.ArgoCD) *v1.RoleBinding {
 func newRoleBindingForSupportNamespaces(cr *argoprojv1a1.ArgoCD, namespace string) *v1.RoleBinding {
 	return &v1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        getRoleBindingNameForSourceNamespaces(cr.Name, cr.Namespace, namespace),
+			Name:        getRoleBindingNameForSourceNamespaces(cr.Name, namespace),
 			Labels:      argoutil.LabelsForCluster(cr),
 			Annotations: argoutil.AnnotationsForCluster(cr),
 			Namespace:   namespace,
@@ -66,7 +66,7 @@ func newRoleBindingForSupportNamespaces(cr *argoprojv1a1.ArgoCD, namespace strin
 	}
 }
 
-func getRoleBindingNameForSourceNamespaces(argocdName, argocdNamespace, targetNamespace string) string {
+func getRoleBindingNameForSourceNamespaces(argocdName, targetNamespace string) string {
 	return fmt.Sprintf("%s_%s", argocdName, targetNamespace)
 }
 
@@ -98,15 +98,14 @@ func (r *ReconcileArgoCD) reconcileRoleBindings(cr *argoprojv1a1.ArgoCD) error {
 // reconcileRoleBinding, creates RoleBindings for every role and associates it with the right ServiceAccount.
 // This would create RoleBindings for all the namespaces managed by the ArgoCD instance.
 func (r *ReconcileArgoCD) reconcileRoleBinding(name string, rules []v1.PolicyRule, cr *argoprojv1a1.ArgoCD) error {
-	var sa *corev1.ServiceAccount
-	var error error
-
-	if sa, error = r.reconcileServiceAccount(name, cr); error != nil {
-		return error
+	sa, err := r.reconcileServiceAccount(name, cr)
+	if err != nil {
+		return err
 	}
 
-	if _, error = r.reconcileRole(name, rules, cr); error != nil {
-		return error
+	err = r.reconcileRole(name, rules, cr)
+	if err != nil {
+		return err
 	}
 
 	for _, namespace := range r.ManagedNamespaces.Items {
@@ -243,7 +242,7 @@ func (r *ReconcileArgoCD) reconcileRoleBinding(name string, rules []v1.PolicyRul
 			}
 
 			// get expected name
-			roleBinding := newRoleBindingWithNameForApplicationSourceNamespaces(name, namespace.Name, cr)
+			roleBinding := newRoleBindingWithNameForApplicationSourceNamespaces(namespace.Name, cr)
 			roleBinding.Namespace = namespace.Name
 
 			roleBinding.RoleRef = v1.RoleRef{
@@ -324,7 +323,7 @@ func getRoleNameForApplicationSourceNamespaces(targetNamespace string, cr *argop
 }
 
 // newRoleBindingWithNameForApplicationSourceNamespaces creates a new RoleBinding with the given name for the source namespaces of ArgoCD Server.
-func newRoleBindingWithNameForApplicationSourceNamespaces(name, namespace string, cr *argoprojv1a1.ArgoCD) *v1.RoleBinding {
+func newRoleBindingWithNameForApplicationSourceNamespaces(namespace string, cr *argoprojv1a1.ArgoCD) *v1.RoleBinding {
 	roleBinding := newRoleBindingForSupportNamespaces(cr, namespace)
 
 	labels := roleBinding.ObjectMeta.Labels
