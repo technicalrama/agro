@@ -1286,6 +1286,12 @@ func (r *ReconcileArgoCD) reconcileServerDeployment(cr *argoproj.ArgoCD, useTLSF
 		},
 	}
 
+	deploy.Spec.Template.Annotations = cr.Spec.Server.PodAnnotations
+
+	for key, value := range cr.Spec.Server.PodLabels {
+		deploy.Spec.Template.Labels[key] = value
+	}
+
 	if replicas := getArgoCDServerReplicas(cr); replicas != nil {
 		deploy.Spec.Replicas = replicas
 	}
@@ -1330,6 +1336,14 @@ func (r *ReconcileArgoCD) reconcileServerDeployment(cr *argoproj.ArgoCD, useTLSF
 				existing.Spec.Replicas = deploy.Spec.Replicas
 				changed = true
 			}
+		}
+		if !reflect.DeepEqual(deploy.Spec.Template.Annotations, existing.Spec.Template.Annotations) {
+			existing.Spec.Template.Annotations = deploy.Spec.Template.Annotations
+			changed = true
+		}
+		if !reflect.DeepEqual(deploy.Spec.Template.Labels, existing.Spec.Template.Labels) {
+			existing.Spec.Template.Labels = deploy.Spec.Template.Labels
+			changed = true
 		}
 		if changed {
 			return r.Client.Update(context.TODO(), existing)
