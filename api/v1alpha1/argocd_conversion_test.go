@@ -188,7 +188,6 @@ func TestAlphaToBetaConversion(t *testing.T) {
 					Provider: SSOProviderTypeKeycloak,
 					Keycloak: &ArgoCDKeycloakSpec{
 						RootCA: "__CA__",
-						Host:   "test-keycloak-host",
 					},
 					VerifyTLS: tls,
 				}
@@ -201,7 +200,6 @@ func TestAlphaToBetaConversion(t *testing.T) {
 					Keycloak: &v1beta1.ArgoCDKeycloakSpec{
 						RootCA:    "__CA__",
 						VerifyTLS: tls,
-						Host:      "test-keycloak-host",
 					},
 				}
 			}),
@@ -211,16 +209,12 @@ func TestAlphaToBetaConversion(t *testing.T) {
 			input: makeTestArgoCDAlpha(func(cr *ArgoCD) {
 				cr.Spec.SSO = &ArgoCDSSOSpec{
 					Image: "test-image",
-					Keycloak: &ArgoCDKeycloakSpec{
-						Host: "test-host",
-					},
 				}
 			}),
 			expectedOutput: makeTestArgoCDBeta(func(cr *v1beta1.ArgoCD) {
 				cr.Spec.SSO = &v1beta1.ArgoCDSSOSpec{
 					Keycloak: &v1beta1.ArgoCDKeycloakSpec{
 						Image: "test-image",
-						Host:  "test-host",
 					},
 				}
 			}),

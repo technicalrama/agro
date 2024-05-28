@@ -109,6 +109,19 @@ Resource Types:
                </tr>
                <tr>
                   <td>
+                     <code>grafana</code></br>
+                     <em>
+                     <a href="#argoproj.io/v1alpha1.ArgoCDGrafanaSpec">
+                     ArgoCDGrafanaSpec
+                     </a>
+                     </em>
+                  </td>
+                  <td>
+                     <p>Grafana defines the Grafana server options for ArgoCD.</p>
+                  </td>
+               </tr>
+               <tr>
+                  <td>
                      <code>ha</code></br>
                      <em>
                      <a href="#argoproj.io/v1alpha1.ArgoCDHASpec">
@@ -923,6 +936,14 @@ Resource Types:
       </tr>
    </tbody>
 </table>
+<h3 id="argoproj.io/v1alpha1.ArgoCDGrafanaSpec">ArgoCDGrafanaSpec</h3>
+<p>
+   (<em>Appears on:</em>
+   <a href="#argoproj.io/v1alpha1.ArgoCDSpec">ArgoCDSpec</a>)
+</p>
+<p>
+<p>ArgoCDGrafanaSpec defines the desired state for the Grafana component.</p>
+</p>
 <table>
    <thead>
       <tr>
@@ -937,6 +958,9 @@ Resource Types:
             <em>
             bool
             </em>
+         </td>
+         <td>
+            <p>Enabled will toggle Grafana support globally for ArgoCD.</p>
          </td>
       </tr>
       <tr>
@@ -957,6 +981,9 @@ Resource Types:
             string
             </em>
          </td>
+         <td>
+            <p>Image is the Grafana container image.</p>
+         </td>
       </tr>
       <tr>
          <td>
@@ -966,6 +993,9 @@ Resource Types:
             ArgoCDIngressSpec
             </a>
             </em>
+         </td>
+         <td>
+            <p>Ingress defines the desired state for an Ingress for the Grafana component.</p>
          </td>
       </tr>
       <tr>
@@ -977,6 +1007,9 @@ Resource Types:
             </a>
             </em>
          </td>
+         <td>
+            <p>Resources defines the Compute Resources required by the container for Grafana.</p>
+         </td>
       </tr>
       <tr>
          <td>
@@ -987,6 +1020,9 @@ Resource Types:
             </a>
             </em>
          </td>
+         <td>
+            <p>Route defines the desired state for an OpenShift Route for the Grafana component.</p>
+         </td>
       </tr>
       <tr>
          <td>
@@ -995,6 +1031,9 @@ Resource Types:
             int32
             </em>
          </td>
+         <td>
+            <p>Size is the replica count for the Grafana Deployment.</p>
+         </td>
       </tr>
       <tr>
          <td>
@@ -1002,6 +1041,9 @@ Resource Types:
             <em>
             string
             </em>
+         </td>
+         <td>
+            <p>Version is the Grafana container image tag.</p>
          </td>
       </tr>
    </tbody>
@@ -1113,6 +1155,7 @@ Resource Types:
 <h3 id="argoproj.io/v1alpha1.ArgoCDIngressSpec">ArgoCDIngressSpec</h3>
 <p>
    (<em>Appears on:</em>
+   <a href="#argoproj.io/v1alpha1.ArgoCDGrafanaSpec">ArgoCDGrafanaSpec</a>, 
    <a href="#argoproj.io/v1alpha1.ArgoCDPrometheusSpec">ArgoCDPrometheusSpec</a>, 
    <a href="#argoproj.io/v1alpha1.ArgoCDServerGRPCSpec">ArgoCDServerGRPCSpec</a>, 
    <a href="#argoproj.io/v1alpha1.ArgoCDServerSpec">ArgoCDServerSpec</a>)
@@ -1570,6 +1613,7 @@ Resource Types:
 <h3 id="argoproj.io/v1alpha1.ArgoCDRouteSpec">ArgoCDRouteSpec</h3>
 <p>
    (<em>Appears on:</em>
+   <a href="#argoproj.io/v1alpha1.ArgoCDGrafanaSpec">ArgoCDGrafanaSpec</a>, 
    <a href="#argoproj.io/v1alpha1.ArgoCDPrometheusSpec">ArgoCDPrometheusSpec</a>, 
    <a href="#argoproj.io/v1alpha1.ArgoCDServerSpec">ArgoCDServerSpec</a>)
 </p>
@@ -1945,6 +1989,19 @@ Resource Types:
          </td>
          <td>
             <p>GAAnonymizeUsers toggles user IDs being hashed before sending to google analytics.</p>
+         </td>
+      </tr>
+      <tr>
+         <td>
+            <code>grafana</code></br>
+            <em>
+            <a href="#argoproj.io/v1alpha1.ArgoCDGrafanaSpec">
+            ArgoCDGrafanaSpec
+            </a>
+            </em>
+         </td>
+         <td>
+            <p>Grafana defines the Grafana server options for ArgoCD.</p>
          </td>
       </tr>
       <tr>

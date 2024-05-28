@@ -5,25 +5,14 @@ strict: true
 theme:
   name: material
   palette:
-  - media: '(prefers-color-scheme: light)'
     primary: teal
-    scheme: default
-    toggle:
-      icon: material/brightness-7
-      name: Switch to dark mode
-  - media: '(prefers-color-scheme: dark)'
-    primary: teal
-    scheme: slate
-    toggle:
-      icon: material/brightness-4
-      name: Switch to light mode
   font:
     text: 'Work Sans'
   logo: 'assets/logo.png'
+extra_css:
+  - 'assets/extra.css'
 markdown_extensions:
-- markdown_include.include
-- codehilite:
-    css_class: highlight
+- codehilite
 - admonition
 - toc:
     permalink: true
@@ -55,13 +44,10 @@ nav:
     - Resource Management: usage/resource_management.md
     - Routes: usage/routes.md
     - Custom Roles: usage/custom_roles.md
-    - Apps in Any Namespace: usage/apps-in-any-namespace.md
-    - Appsets in Any Namespace: usage/appsets-in-any-namespace.md
   - Reference:
     - ArgoCD: reference/argocd.md
     - ArgoCDExport: reference/argocdexport.md
     - API Docs: reference/api.html.md
-    - NotificationsConfiguration: reference/notificationsconfiguration.md
   - Contributing: 
       - Contributing: developer-guide/contributing.md
       - Development: 

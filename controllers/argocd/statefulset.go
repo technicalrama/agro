@@ -33,7 +33,7 @@ import (
 	"github.com/argoproj-labs/argocd-operator/controllers/argoutil"
 )
 
-func getRedisHAReplicas() *int32 {
+func getRedisHAReplicas(cr *argoproj.ArgoCD) *int32 {
 	replicas := common.ArgoCDDefaultRedisHAReplicas
 	// TODO: Allow override of this value through CR?
 	return &replicas
@@ -107,7 +107,7 @@ func (r *ReconcileArgoCD) reconcileRedisStatefulSet(cr *argoproj.ArgoCD) error {
 	})
 
 	ss.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
-	ss.Spec.Replicas = getRedisHAReplicas()
+	ss.Spec.Replicas = getRedisHAReplicas(cr)
 	ss.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			common.ArgoCDKeyName: nameWithSuffix("redis-ha", cr),
@@ -416,8 +416,8 @@ func (r *ReconcileArgoCD) reconcileRedisStatefulSet(cr *argoproj.ArgoCD) error {
 
 	existing := newStatefulSetWithSuffix("redis-ha-server", "redis", cr)
 	if argoutil.IsObjectFound(r.Client, cr.Namespace, existing.Name, existing) {
-		if !(cr.Spec.HA.Enabled && cr.Spec.Redis.IsEnabled()) {
-			// StatefulSet exists but either HA or component enabled flag has been set to false, delete the StatefulSet
+		if !cr.Spec.HA.Enabled {
+			// StatefulSet exists but HA enabled flag has been set to false, delete the StatefulSet
 			return r.Client.Delete(context.TODO(), existing)
 		}
 
@@ -447,16 +447,6 @@ func (r *ReconcileArgoCD) reconcileRedisStatefulSet(cr *argoproj.ArgoCD) error {
 		}
 
 		return nil // StatefulSet found, do nothing
-	}
-
-	if cr.Spec.Redis.IsEnabled() && cr.Spec.Redis.Remote != nil && *cr.Spec.Redis.Remote != "" {
-		log.Info("Custom Redis Endpoint. Skipping starting redis.")
-		return nil
-	}
-
-	if !cr.Spec.Redis.IsEnabled() {
-		log.Info("Redis disabled. Skipping starting Redis.") // Redis not enabled, do nothing.
-		return nil
 	}
 
 	if !cr.Spec.HA.Enabled {
@@ -696,11 +686,6 @@ func (r *ReconcileArgoCD) reconcileApplicationControllerStatefulSet(cr *argoproj
 
 	existing := newStatefulSetWithSuffix("application-controller", "application-controller", cr)
 	if argoutil.IsObjectFound(r.Client, cr.Namespace, existing.Name, existing) {
-		if !cr.Spec.Controller.IsEnabled() {
-			log.Info("Existing application controller found but should be disabled. Deleting Application Controller")
-			// Delete existing deployment for Application Controller, if any ..
-			return r.Client.Delete(context.TODO(), existing)
-		}
 		actualImage := existing.Spec.Template.Spec.Containers[0].Image
 		desiredImage := getArgoContainerImage(cr)
 		changed := false
@@ -746,11 +731,6 @@ func (r *ReconcileArgoCD) reconcileApplicationControllerStatefulSet(cr *argoproj
 			return r.Client.Update(context.TODO(), existing)
 		}
 		return nil // StatefulSet found with nothing to do, move along...
-	}
-
-	if !cr.Spec.Controller.IsEnabled() {
-		log.Info("Application Controller disabled. Skipping starting application controller.")
-		return nil
 	}
 
 	// Delete existing deployment for Application Controller, if any ..

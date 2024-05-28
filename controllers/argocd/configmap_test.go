@@ -94,7 +94,7 @@ func TestReconcileArgoCD_reconcileTLSCerts_configMapUpdate(t *testing.T) {
 	}
 
 	// update a new cert in argocd-tls-certs-cm
-	testPEM := generateEncodedPEM(t)
+	testPEM := generateEncodedPEM(t, "example.com")
 
 	configMap.Data["example.com"] = string(testPEM)
 	assert.NoError(t, r.Client.Update(context.TODO(), configMap))
@@ -342,26 +342,6 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withDisableAdmin(t *testing.T) {
 func TestReconcileArgoCD_reconcileArgoConfigMap_withDexConnector(t *testing.T) {
 	logf.SetLogger(ZapLogger(true))
 
-	getSampleDexConfig := func(t *testing.T) []byte {
-		t.Helper()
-
-		type expiry struct {
-			IdTokens    string `yaml:"idTokens"`
-			SigningKeys string `yaml:"signingKeys"`
-		}
-
-		dexCfg := map[string]interface{}{
-			"expiry": expiry{
-				IdTokens:    "1hr",
-				SigningKeys: "12hr",
-			},
-		}
-
-		dexCfgBytes, err := yaml.Marshal(dexCfg)
-		assert.NoError(t, err)
-		return dexCfgBytes
-	}
-
 	tests := []struct {
 		name             string
 		updateCrSpecFunc func(cr *argoproj.ArgoCD)
@@ -373,18 +353,6 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withDexConnector(t *testing.T) {
 					Provider: argoproj.SSOProviderTypeDex,
 					Dex: &argoproj.ArgoCDDexSpec{
 						OpenShiftOAuth: true,
-					},
-				}
-			},
-		},
-		{
-			name: "update .dex.config and verify that the dex connector is not overwritten",
-			updateCrSpecFunc: func(cr *argoproj.ArgoCD) {
-				cr.Spec.SSO = &argoproj.ArgoCDSSOSpec{
-					Provider: argoproj.SSOProviderTypeDex,
-					Dex: &argoproj.ArgoCDDexSpec{
-						OpenShiftOAuth: true,
-						Config:         string(getSampleDexConfig(t)),
 					},
 				}
 			},
@@ -448,17 +416,6 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withDexConnector(t *testing.T) {
 			dexConnector := connectors.([]interface{})[0].(map[interface{}]interface{})
 			config := dexConnector["config"]
 			assert.Equal(t, config.(map[interface{}]interface{})["clientID"], "system:serviceaccount:argocd:argocd-argocd-dex-server")
-
-			// verify that the dex config in the CR matches the config from the argocd-cm
-			if a.Spec.SSO.Dex.Config != "" {
-				expectedCfg := make(map[string]interface{})
-				expectedCfgStr, err := r.getOpenShiftDexConfig(a)
-				assert.NoError(t, err)
-
-				err = yaml.Unmarshal([]byte(expectedCfgStr), expectedCfg)
-				assert.NoError(t, err, fmt.Sprintf("failed to unmarshal %s", dex))
-				assert.Equal(t, expectedCfg, m)
-			}
 		})
 	}
 
@@ -834,11 +791,6 @@ managedfieldsmanagers:
 			Kind:  "healthBar",
 			Check: "healthBar",
 		},
-		{
-			Group: "",
-			Kind:  "healthFooBar",
-			Check: "healthFooBar",
-		},
 	}
 	actions := []argoproj.ResourceAction{
 		{
@@ -851,11 +803,6 @@ managedfieldsmanagers:
 			Kind:   "actionsBar",
 			Action: "actionsBar",
 		},
-		{
-			Group:  "",
-			Kind:   "actionsFooBar",
-			Action: "actionsFooBar",
-		},
 	}
 	ignoreDifferences := argoproj.ResourceIgnoreDifference{
 		All: &argoproj.IgnoreDifferenceCustomization{
@@ -867,15 +814,6 @@ managedfieldsmanagers:
 			{
 				Group: "ignoreDiffBar",
 				Kind:  "ignoreDiffBar",
-				Customization: argoproj.IgnoreDifferenceCustomization{
-					JqPathExpressions:     []string{"a", "b"},
-					JsonPointers:          []string{"a", "b"},
-					ManagedFieldsManagers: []string{"a", "b"},
-				},
-			},
-			{
-				Group: "",
-				Kind:  "ignoreDiffFoo",
 				Customization: argoproj.IgnoreDifferenceCustomization{
 					JqPathExpressions:     []string{"a", "b"},
 					JsonPointers:          []string{"a", "b"},
@@ -911,13 +849,10 @@ managedfieldsmanagers:
 	desiredCM := make(map[string]string)
 	desiredCM["resource.customizations.health.healthFoo_healthFoo"] = "healthFoo"
 	desiredCM["resource.customizations.health.healthBar_healthBar"] = "healthBar"
-	desiredCM["resource.customizations.health.healthFooBar"] = "healthFooBar"
 	desiredCM["resource.customizations.actions.actionsFoo_actionsFoo"] = "actionsFoo"
 	desiredCM["resource.customizations.actions.actionsBar_actionsBar"] = "actionsBar"
-	desiredCM["resource.customizations.actions.actionsFooBar"] = "actionsFooBar"
 	desiredCM["resource.customizations.ignoreDifferences.all"] = desiredIgnoreDifferenceCustomization
 	desiredCM["resource.customizations.ignoreDifferences.ignoreDiffBar_ignoreDiffBar"] = desiredIgnoreDifferenceCustomization
-	desiredCM["resource.customizations.ignoreDifferences.ignoreDiffFoo"] = desiredIgnoreDifferenceCustomization
 
 	for k, v := range desiredCM {
 		if value, ok := cm.Data[k]; !ok || value != v {

@@ -18,7 +18,6 @@ import (
 	"errors"
 	"fmt"
 
-	deploymentConfig "github.com/openshift/api/apps/v1"
 	template "github.com/openshift/api/template/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -34,29 +33,22 @@ const (
 )
 
 var (
-	templateAPIFound         = false
-	deploymentConfigAPIFound = false
-	ssoConfigLegalStatus     string
+	templateAPIFound     = false
+	ssoConfigLegalStatus string
 )
 
-// CanUseKeycloakWithTemplate checks if the required APIs are available to
-// manage a Keycloak instance using Templates.
-func CanUseKeycloakWithTemplate() bool {
-	return templateAPIFound && deploymentConfigAPIFound
+// IsTemplateAPIAvailable returns true if the template API is present.
+func IsTemplateAPIAvailable() bool {
+	return templateAPIFound
 }
 
-func verifyKeycloakTemplateAPIs() error {
-	var err error
-	deploymentConfigAPIFound, err = argoutil.VerifyAPI(deploymentConfig.GroupVersion.Group, deploymentConfig.GroupVersion.Version)
+// verifyTemplateAPI will verify that the template API is present.
+func verifyTemplateAPI() error {
+	found, err := argoutil.VerifyAPI(template.SchemeGroupVersion.Group, template.SchemeGroupVersion.Version)
 	if err != nil {
 		return err
 	}
-
-	templateAPIFound, err = argoutil.VerifyAPI(template.GroupVersion.Group, template.GroupVersion.Version)
-	if err != nil {
-		return err
-	}
-
+	templateAPIFound = found
 	return nil
 }
 
@@ -122,16 +114,6 @@ func (r *ReconcileArgoCD) reconcileSSO(cr *argoproj.ArgoCD) error {
 				ssoConfigLegalStatus = ssoLegalFailed // set global indicator that SSO config has gone wrong
 				_ = r.reconcileStatusSSO(cr)
 				return err
-			}
-
-			// DeploymentConfig API is being deprecated with OpenShift 4.14. Users who wish to
-			// install Keycloak using Template should enable the DeploymentConfig API.
-			if templateAPIFound && !deploymentConfigAPIFound {
-				ssoConfigLegalStatus = ssoLegalFailed
-				if err := r.reconcileStatusSSO(cr); err != nil {
-					return err
-				}
-				return fmt.Errorf("cannot manage Keycloak using Template since the DeploymentConfig API is not found")
 			}
 		}
 

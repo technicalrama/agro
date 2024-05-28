@@ -233,11 +233,9 @@ func getArgoRepoCommand(cr *argoproj.ArgoCD, useTLSForRedis bool) []string {
 	cmd = append(cmd, "uid_entrypoint.sh")
 	cmd = append(cmd, "argocd-repo-server")
 
-	if cr.Spec.Redis.IsEnabled() {
-		cmd = append(cmd, "--redis", getRedisServerAddress(cr))
-	} else {
-		log.Info("Redis is Disabled. Skipping adding Redis configuration to Repo Server.")
-	}
+	cmd = append(cmd, "--redis")
+	cmd = append(cmd, getRedisServerAddress(cr))
+
 	if useTLSForRedis {
 		cmd = append(cmd, "--redis-use-tls")
 		if isRedisTLSVerificationDisabled(cr) {
@@ -294,17 +292,11 @@ func getArgoServerCommand(cr *argoproj.ArgoCD, useTLSForRedis bool) []string {
 	cmd = append(cmd, "--dex-server")
 	cmd = append(cmd, getDexServerAddress(cr))
 
-	if cr.Spec.Repo.IsEnabled() {
-		cmd = append(cmd, "--repo-server", getRepoServerAddress(cr))
-	} else {
-		log.Info("Repo Server is disabled. This would affect the functioning of ArgoCD Server.")
-	}
+	cmd = append(cmd, "--repo-server")
+	cmd = append(cmd, getRepoServerAddress(cr))
 
-	if cr.Spec.Redis.IsEnabled() {
-		cmd = append(cmd, "--redis", getRedisServerAddress(cr))
-	} else {
-		log.Info("Redis is Disabled. Skipping adding Redis configuration to ArgoCD Server.")
-	}
+	cmd = append(cmd, "--redis")
+	cmd = append(cmd, getRedisServerAddress(cr))
 
 	if useTLSForRedis {
 		cmd = append(cmd, "--redis-use-tls")
@@ -357,9 +349,6 @@ func getDexServerAddress(cr *argoproj.ArgoCD) string {
 
 // getRepoServerAddress will return the Argo CD repo server address.
 func getRepoServerAddress(cr *argoproj.ArgoCD) string {
-	if cr.Spec.Repo.Remote != nil && *cr.Spec.Repo.Remote != "" {
-		return *cr.Spec.Repo.Remote
-	}
 	return fqdnServiceRef("repo-server", common.ArgoCDDefaultRepoServerPort, cr)
 }
 
@@ -451,11 +440,134 @@ func (r *ReconcileArgoCD) reconcileDeployments(cr *argoproj.ArgoCD, useTLSForRed
 
 // reconcileGrafanaDeployment will ensure the Deployment resource is present for the ArgoCD Grafana component.
 func (r *ReconcileArgoCD) reconcileGrafanaDeployment(cr *argoproj.ArgoCD) error {
+	deploy := newDeploymentWithSuffix("grafana", "grafana", cr)
+	deploy.Spec.Replicas = getGrafanaReplicas(cr)
+	AddSeccompProfileForOpenShift(r.Client, &deploy.Spec.Template.Spec)
+	deploy.Spec.Template.Spec.Containers = []corev1.Container{{
+		Image:           getGrafanaContainerImage(cr),
+		ImagePullPolicy: corev1.PullAlways,
+		Name:            "grafana",
+		Ports: []corev1.ContainerPort{
+			{
+				ContainerPort: 3000,
+			},
+		},
+		Env:       proxyEnvVars(),
+		Resources: getGrafanaResources(cr),
+		SecurityContext: &corev1.SecurityContext{
+			AllowPrivilegeEscalation: boolPtr(false),
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{
+					"ALL",
+				},
+			},
+			RunAsNonRoot: boolPtr(true),
+			RunAsUser:    int64Ptr(472),
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "grafana-config",
+				MountPath: "/etc/grafana",
+			}, {
+				Name:      "grafana-datasources-config",
+				MountPath: "/etc/grafana/provisioning/datasources",
+			}, {
+				Name:      "grafana-dashboards-config",
+				MountPath: "/etc/grafana/provisioning/dashboards",
+			}, {
+				Name:      "grafana-dashboard-templates",
+				MountPath: "/var/lib/grafana/dashboards",
+			},
+		},
+	}}
+
+	deploy.Spec.Template.Spec.ServiceAccountName = fmt.Sprintf("%s-%s", cr.Name, "argocd-grafana")
+	deploy.Spec.Template.Spec.Volumes = []corev1.Volume{
+		{
+			Name: "grafana-config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: nameWithSuffix("grafana-config", cr),
+					},
+					Items: []corev1.KeyToPath{{
+						Key:  "grafana.ini",
+						Path: "grafana.ini",
+					}},
+				},
+			},
+		}, {
+			Name: "grafana-datasources-config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: nameWithSuffix("grafana-config", cr),
+					},
+					Items: []corev1.KeyToPath{{
+						Key:  "datasource.yaml",
+						Path: "datasource.yaml",
+					}},
+				},
+			},
+		}, {
+			Name: "grafana-dashboards-config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: nameWithSuffix("grafana-config", cr),
+					},
+					Items: []corev1.KeyToPath{{
+						Key:  "provider.yaml",
+						Path: "provider.yaml",
+					}},
+				},
+			},
+		}, {
+			Name: "grafana-dashboard-templates",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: nameWithSuffix("grafana-dashboards", cr),
+					},
+				},
+			},
+		},
+	}
+
+	existing := newDeploymentWithSuffix("grafana", "grafana", cr)
+	if argoutil.IsObjectFound(r.Client, cr.Namespace, existing.Name, existing) {
+		if !cr.Spec.Grafana.Enabled {
+			// Deployment exists but enabled flag has been set to false, delete the Deployment
+			return r.Client.Delete(context.TODO(), existing)
+		}
+		changed := false
+		if hasGrafanaSpecChanged(existing, cr) {
+			existing.Spec.Replicas = cr.Spec.Grafana.Size
+			changed = true
+		}
+		updateNodePlacement(existing, deploy, &changed)
+		if !reflect.DeepEqual(existing.Spec.Template.Spec.Containers[0].Env,
+			deploy.Spec.Template.Spec.Containers[0].Env) {
+			existing.Spec.Template.Spec.Containers[0].Env = deploy.Spec.Template.Spec.Containers[0].Env
+			changed = true
+		}
+		if !reflect.DeepEqual(deploy.Spec.Template.Spec.Containers[0].Resources, existing.Spec.Template.Spec.Containers[0].Resources) {
+			existing.Spec.Template.Spec.Containers[0].Resources = deploy.Spec.Template.Spec.Containers[0].Resources
+			changed = true
+		}
+		if changed {
+			return r.Client.Update(context.TODO(), existing)
+		}
+		return nil // Deployment found, do nothing
+	}
+
 	if !cr.Spec.Grafana.Enabled {
 		return nil // Grafana not enabled, do nothing.
 	}
-	log.Info(grafanaDeprecatedWarning)
-	return nil
+	if err := controllerutil.SetControllerReference(cr, deploy, r.Scheme); err != nil {
+		return err
+	}
+	return r.Client.Create(context.TODO(), deploy)
 }
 
 // reconcileRedisDeployment will ensure the Deployment resource is present for the ArgoCD Redis component.
@@ -525,11 +637,6 @@ func (r *ReconcileArgoCD) reconcileRedisDeployment(cr *argoproj.ArgoCD, useTLS b
 
 	existing := newDeploymentWithSuffix("redis", "redis", cr)
 	if argoutil.IsObjectFound(r.Client, cr.Namespace, existing.Name, existing) {
-		if !cr.Spec.Redis.IsEnabled() {
-			// Deployment exists but component enabled flag has been set to false, delete the Deployment
-			log.Info("Redis exists but should be disabled. Deleting existing redis.")
-			return r.Client.Delete(context.TODO(), deploy)
-		}
 		if cr.Spec.HA.Enabled {
 			// Deployment exists but HA enabled flag has been set to true, delete the Deployment
 			return r.Client.Delete(context.TODO(), deploy)
@@ -564,16 +671,6 @@ func (r *ReconcileArgoCD) reconcileRedisDeployment(cr *argoproj.ArgoCD, useTLS b
 			return r.Client.Update(context.TODO(), existing)
 		}
 		return nil // Deployment found with nothing to do, move along...
-	}
-
-	if cr.Spec.Redis.IsEnabled() && cr.Spec.Redis.Remote != nil && *cr.Spec.Redis.Remote != "" {
-		log.Info("Custom Redis Endpoint. Skipping starting redis.")
-		return nil
-	}
-
-	if !cr.Spec.Redis.IsEnabled() {
-		log.Info("Redis disabled. Skipping starting redis.")
-		return nil
 	}
 
 	if cr.Spec.HA.Enabled {
@@ -1055,13 +1152,6 @@ func (r *ReconcileArgoCD) reconcileRepoDeployment(cr *argoproj.ArgoCD, useTLSFor
 
 	existing := newDeploymentWithSuffix("repo-server", "repo-server", cr)
 	if argoutil.IsObjectFound(r.Client, cr.Namespace, existing.Name, existing) {
-
-		if !cr.Spec.Repo.IsEnabled() {
-			log.Info("Existing ArgoCD Repo Server found but should be disabled. Deleting Repo Server")
-			// Delete existing deployment for ArgoCD Repo Server, if any ..
-			return r.Client.Delete(context.TODO(), existing)
-		}
-
 		changed := false
 		actualImage := existing.Spec.Template.Spec.Containers[0].Image
 		desiredImage := getRepoServerContainerImage(cr)
@@ -1121,7 +1211,6 @@ func (r *ReconcileArgoCD) reconcileRepoDeployment(cr *argoproj.ArgoCD, useTLSFor
 
 		if deploy.Spec.Template.Spec.ServiceAccountName != existing.Spec.Template.Spec.ServiceAccountName {
 			existing.Spec.Template.Spec.ServiceAccountName = deploy.Spec.Template.Spec.ServiceAccountName
-			existing.Spec.Template.Spec.DeprecatedServiceAccount = deploy.Spec.Template.Spec.ServiceAccountName
 			changed = true
 		}
 
@@ -1129,11 +1218,6 @@ func (r *ReconcileArgoCD) reconcileRepoDeployment(cr *argoproj.ArgoCD, useTLSFor
 			return r.Client.Update(context.TODO(), existing)
 		}
 		return nil // Deployment found with nothing to do, move along...
-	}
-
-	if !cr.Spec.Repo.IsEnabled() {
-		log.Info("ArgoCD Repo Server disabled. Skipping starting ArgoCD Repo Server.")
-		return nil
 	}
 
 	if err := controllerutil.SetControllerReference(cr, deploy, r.Scheme); err != nil {
@@ -1268,11 +1352,6 @@ func (r *ReconcileArgoCD) reconcileServerDeployment(cr *argoproj.ArgoCD, useTLSF
 
 	existing := newDeploymentWithSuffix("server", "server", cr)
 	if argoutil.IsObjectFound(r.Client, cr.Namespace, existing.Name, existing) {
-		if !cr.Spec.Server.IsEnabled() {
-			log.Info("Existing ArgoCD Server found but should be disabled. Deleting ArgoCD Server")
-			// Delete existing deployment for ArgoCD Server, if any ..
-			return r.Client.Delete(context.TODO(), existing)
-		}
 		actualImage := existing.Spec.Template.Spec.Containers[0].Image
 		desiredImage := getArgoContainerImage(cr)
 		changed := false
@@ -1316,11 +1395,6 @@ func (r *ReconcileArgoCD) reconcileServerDeployment(cr *argoproj.ArgoCD, useTLSF
 			return r.Client.Update(context.TODO(), existing)
 		}
 		return nil // Deployment found with nothing to do, move along...
-	}
-
-	if !cr.Spec.Server.IsEnabled() {
-		log.Info("ArgoCD Server disabled. Skipping starting argocd server.")
-		return nil
 	}
 
 	if err := controllerutil.SetControllerReference(cr, deploy, r.Scheme); err != nil {

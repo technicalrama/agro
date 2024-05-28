@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -101,8 +101,9 @@ func (r *ReconcileArgoCD) reconcileDexConfiguration(cm *corev1.ConfigMap, cr *ar
 	actual := cm.Data[common.ArgoCDKeyDexConfig]
 	desired := getDexConfig(cr)
 
-	// Append the default OpenShift dex config if the openShiftOAuth is requested through `.spec.sso.dex`.
-	if cr.Spec.SSO != nil && cr.Spec.SSO.Dex != nil && cr.Spec.SSO.Dex.OpenShiftOAuth {
+	// If no dexConfig expressed but openShiftOAuth is requested through `.spec.sso.dex`, use default
+	// openshift dex config
+	if len(desired) <= 0 && (cr.Spec.SSO != nil && cr.Spec.SSO.Dex != nil && cr.Spec.SSO.Dex.OpenShiftOAuth) {
 		cfg, err := r.getOpenShiftDexConfig(cr)
 		if err != nil {
 			return err
@@ -132,6 +133,7 @@ func (r *ReconcileArgoCD) reconcileDexConfiguration(cm *corev1.ConfigMap, cr *ar
 
 // getOpenShiftDexConfig will return the configuration for the Dex server running on OpenShift.
 func (r *ReconcileArgoCD) getOpenShiftDexConfig(cr *argoproj.ArgoCD) (string, error) {
+
 	groups := []string{}
 
 	// Allow override of groups from CR
@@ -159,35 +161,13 @@ func (r *ReconcileArgoCD) getOpenShiftDexConfig(cr *argoproj.ArgoCD) (string, er
 	dex := make(map[string]interface{})
 	dex["connectors"] = connectors
 
-	// add dex config from the Argo CD CR.
-	if err := addDexConfigFromCR(cr, dex); err != nil {
-		return "", err
-	}
-
 	bytes, err := yaml.Marshal(dex)
 	return string(bytes), err
 }
 
-func addDexConfigFromCR(cr *argoproj.ArgoCD, dex map[string]interface{}) error {
-	dexCfgStr := getDexConfig(cr)
-	if dexCfgStr == "" {
-		return nil
-	}
-
-	dexCfg := make(map[string]interface{})
-	if err := yaml.Unmarshal([]byte(dexCfgStr), dexCfg); err != nil {
-		return err
-	}
-
-	for k, v := range dexCfg {
-		dex[k] = v
-	}
-
-	return nil
-}
-
 // reconcileDexServiceAccount will ensure that the Dex ServiceAccount is configured properly for OpenShift OAuth.
 func (r *ReconcileArgoCD) reconcileDexServiceAccount(cr *argoproj.ArgoCD) error {
+
 	// if openShiftOAuth set to false in `.spec.sso.dex`, no need to configure it
 	if cr.Spec.SSO == nil || cr.Spec.SSO.Dex == nil || !cr.Spec.SSO.Dex.OpenShiftOAuth {
 		return nil // OpenShift OAuth not enabled, move along...
@@ -227,11 +207,6 @@ func (r *ReconcileArgoCD) reconcileDexDeployment(cr *argoproj.ArgoCD) error {
 
 	AddSeccompProfileForOpenShift(r.Client, &deploy.Spec.Template.Spec)
 
-	dexEnv := proxyEnvVars()
-	if cr.Spec.SSO != nil && cr.Spec.SSO.Dex != nil {
-		dexEnv = append(dexEnv, cr.Spec.SSO.Dex.Env...)
-	}
-
 	deploy.Spec.Template.Spec.Containers = []corev1.Container{{
 		Command: []string{
 			"/shared/argocd-dex",
@@ -239,7 +214,7 @@ func (r *ReconcileArgoCD) reconcileDexDeployment(cr *argoproj.ArgoCD) error {
 		},
 		Image: getDexContainerImage(cr),
 		Name:  "dex",
-		Env:   dexEnv,
+		Env:   proxyEnvVars(),
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
@@ -422,6 +397,7 @@ func (r *ReconcileArgoCD) reconcileDexService(cr *argoproj.ArgoCD) error {
 // reconcileDexResources consolidates all dex resources reconciliation calls. It serves as the single place to trigger both creation
 // and deletion of dex resources based on the specified configuration of dex
 func (r *ReconcileArgoCD) reconcileDexResources(cr *argoproj.ArgoCD) error {
+
 	if _, err := r.reconcileRole(common.ArgoCDDexServerComponent, policyRuleForDexServer(), cr); err != nil {
 		log.Error(err, "error reconciling dex role")
 	}
@@ -465,6 +441,7 @@ func (r *ReconcileArgoCD) reconcileDexResources(cr *argoproj.ArgoCD) error {
 // Deployment and RoleBinding must be deleted before the role and sa. deleteDexResources will only be called during
 // delete events, so we don't need to worry about duplicate, recurring reconciliation calls
 func (r *ReconcileArgoCD) deleteDexResources(cr *argoproj.ArgoCD) error {
+
 	sa := &corev1.ServiceAccount{}
 	role := &rbacv1.Role{}
 

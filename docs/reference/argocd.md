@@ -19,6 +19,7 @@ Name | Default | Description
 [**ExtraConfig**](#extra-config) | [Empty] | A catch-all mechanism to populate the argocd-cm configmap.
 [**GATrackingID**](#ga-tracking-id) | [Empty] | The google analytics tracking ID to use.
 [**GAAnonymizeUsers**](#ga-anonymize-users) | `false` | Enable hashed usernames sent to google analytics.
+[**Grafana**](#grafana-options) | [Object] | Grafana configuration options.
 [**HA**](#ha-options) | [Object] | High Availability options.
 [**HelpChatURL**](#help-chat-url) | `https://mycorp.slack.com/argo-cd` | URL for getting chat help, this will typically be your Slack channel for support.
 [**HelpChatText**](#help-chat-text) | `Chat now!` | The text for getting chat help.
@@ -85,9 +86,6 @@ LogLevel | info | The log level to be used by the ArgoCD Application Controller 
 LogFormat | text | The log format to be used by the ArgoCD Application Controller component. Valid options are text or json.
 ParallelismLimit | 10 | The kubectl parallelism limit to set for the controller (`--kubectl-parallelism-limit` flag)
 SCMRootCAConfigMap (#add-tls-certificate-for-gitlab-scm-provider-to-applicationsets-controller) | [Empty] | The name of the config map that stores the Gitlab SCM Provider's TLS certificate which will be mounted on the ApplicationSet Controller at `"/app/tls/scm/cert"` path.
-Enabled|true|Flag to enable/disable the ApplicationSet Controller during ArgoCD installation.
-SourceNamespaces|[Empty]|List of namespaces other than control-plane namespace where appsets can be created.
-SCMProviders|[Empty]|List of allowed Source Code Manager (SCM) providers URL.
 
 ### ApplicationSet Controller Example
 
@@ -106,7 +104,7 @@ spec:
 
 ### Add Command Arguments to ApplicationSets Controller
 
-Below example shows how a user can add command arguments to the ApplicationSet controller.
+Below example shows how a user can add command arguments to the ApplicationSet controller. 
 
 ``` yaml
 apiVersion: argoproj.io/v1alpha1
@@ -138,6 +136,7 @@ spec:
   applicationSet:
     SCMRootCAConfigMap: example-gitlab-scm-tls-cert
 ```
+
 
 ## Config Management Plugins
 
@@ -201,7 +200,7 @@ spec:
     resources: {}
 ```
 
-The following example shows how to set command line parameters using the env variable
+The following example shows how to set command line parameters using the env variable 
 
 ``` yaml
 apiVersion: argoproj.io/v1alpha1
@@ -214,7 +213,7 @@ spec:
   controller:
     env:
     - name: ARGOCD_APPLICATION_CONTROLLER_REPO_SERVER_TIMEOUT_SECONDS
-      value: '120'
+      value: '120'    
 ```
 
 The following example shows how to set multiple replicas of Argo CD Application Controller. This example will scale up/down the Argo CD Application Controller based on the parameter clustersPerShard. The number of replicas will be set between minShards and maxShards.
@@ -237,6 +236,7 @@ spec:
 
 !!! note
     In case the number of replicas required is less than the minShards the number of replicas will be set as minShards. Similarly, if the required number of replicas exceeds maxShards, the replica count will be set as maxShards.
+
 
 The following example shows how to enable dynamic scaling of the ArgoCD Application Controller component.
 
@@ -330,6 +330,70 @@ metadata:
     example: ga-anonymize-users
 spec:
   gaAnonymizeUsers: true
+```
+
+## Grafana Options
+
+The following properties are available for configuring the Grafana component.
+
+Name | Default | Description
+--- | --- | ---
+Enabled | false | Toggle Grafana support globally for ArgoCD.
+Host | `example-argocd-grafana` | The hostname to use for Ingress/Route resources.
+Image | `grafana/grafana` | The container image for Grafana. This overrides the `ARGOCD_GRAFANA_IMAGE` environment variable.
+[Ingress](#grafana-ingress-options) | [Object] | Ingress configuration for Grafana.
+Resources | [Empty] | The container compute resources.
+[Route](#grafana-route-options) | [Object] | Route configuration options.
+Size | 1 | The replica count for the Grafana Deployment.
+Version | 6.7.1 (SHA) | The tag to use with the Grafana container image.
+
+### Grafana Ingress Options
+
+The following properties are available for configuring the Grafana Ingress.
+
+Name | Default | Description
+--- | --- | ---
+Annotations | [Empty] | The map of annotations to use for the Ingress resource.
+Enabled | `false` | Toggle creation of an Ingress resource.
+IngressClassName | [Empty] | IngressClass to use for the Ingress resource.
+Path | `/` | Path to use for Ingress resources.
+TLS | [Empty] | TLS configuration for the Ingress.
+
+### Grafana Route Options
+
+The following properties are available to configure the Route for the Grafana component.
+
+Name | Default | Description
+--- | --- | ---
+Annotations | [Empty] | The map of annotations to add to the Route.
+Enabled | `false` | Toggles the creation of a Route for the Grafana component.
+Labels | [Empty] | The map of labels to add to the Route.
+Path | `/` | The path for the Route.
+TLS | [Object] | The TLSConfig for the Route.
+WildcardPolicy| `None` | The wildcard policy for the Route. Can be one of `Subdomain` or `None`.
+
+### Grafana Example
+
+The following example shows all properties set to the default values.
+
+``` yaml
+apiVersion: argoproj.io/v1alpha1
+kind: ArgoCD
+metadata:
+  name: example-argocd
+  labels:
+    example: insights
+spec:
+  grafana:
+    enabled: false
+    host: example-argocd-grafana
+    image: grafana/grafana
+    ingress:
+      enabled: false
+    resources: {}
+    route: false
+    size: 1
+    version: 6.7.1
 ```
 
 ## HA Options
@@ -693,10 +757,10 @@ metadata:
   labels:
     example: nodeplacement-example
 spec:
-  nodePlacement:
-    nodeSelector:
+  nodePlacement: 
+    nodeSelector: 
       key1: value1
-    tolerations:
+    tolerations: 
     - key: key1
       operator: Equal
       value: value1
@@ -704,7 +768,7 @@ spec:
     - key: key1
       operator: Equal
       value: value1
-      effect: NoExecute
+      effect: NoExecute   
 ```
 
 ## Prometheus Options
@@ -901,7 +965,7 @@ spec:
 
 Resource behavior can be customized using subkeys (`resourceHealthChecks`, `resourceIgnoreDifferences`, and `resourceActions`). Each of the subkeys maps directly to their own field in the `argocd-cm`. `resourceHealthChecks` will map to `resource.customizations.health`, `resourceIgnoreDifferences` to `resource.customizations.ignoreDifferences`, and `resourceActions` to `resource.customizations.actions`.
 
-!!! note
+!!! note 
     `.spec.resourceCustomizations` field is no longer in support from Argo CD Operator v0.8.0 onward. Consider using `resourceHealthChecks`, `resourceIgnoreDifferences`, and `resourceActions` instead.
 
 ### Resource Customizations (with subkeys)
@@ -994,7 +1058,7 @@ spec:
             return obj
 ```
 
-After applying these changes your `argocd-cm` Configmap should contain the following fields:
+After applying these changes your `argocd-cm` Configmap should contain the following fields: 
 
 ```
 resource.customizations.ignoreDifferences.apps_Deployment: |
@@ -1084,7 +1148,7 @@ spec:
         - /spec/replicas
 ```
 
-After applying these changes your `argocd-cm` Configmap should contain the following fields:
+After applying these changes your `argocd-cm` Configmap should contain the following fields: 
 
 ```
 resource.customizations.ignoreDifferences.admissionregistration.k8s.io_MutatingWebhookConfiguration: |
@@ -1163,7 +1227,7 @@ spec:
 
 ## Resource Tracking Method
 
-You can configure which
+You can configure which 
 [resource tracking method](https://argo-cd.readthedocs.io/en/stable/user-guide/resource_tracking/#choosing-a-tracking-method)
 Argo CD should use to keep track of the resources it manages.
 
@@ -1222,7 +1286,7 @@ Enabled | false | Toggle Autoscaling support globally for the Argo CD server com
 HPA | [Object] | HorizontalPodAutoscaler options for the Argo CD Server component.
 
 !!! note
-    When `.spec.server.autoscale.enabled` is set to `true`, the number of required replicas (if set) in `.spec.server.replicas` will be ignored. The final replica count on the server deployment will be controlled by the Horizontal Pod Autoscaler instead.
+    When `.spec.server.autoscale.enabled` is set to `true`, the number of required replicas (if set) in `.spec.server.replicas` will be ignored. The final replica count on the server deployment will be controlled by the Horizontal Pod Autoscaler instead. 
 
 ### Server Command Arguments
 
@@ -1385,14 +1449,13 @@ Image | `quay.io/dexidp/dex` | The container image for Dex. This overrides the `
 OpenShiftOAuth | false | Enable automatic configuration of OpenShift OAuth authentication for the Dex server. This is ignored if a value is present for `sso.dex.config`.
 Resources | [Empty] | The container compute resources.
 Version | v2.21.0 (SHA) | The tag to use with the Dex container image.
-Env | [Empty] | Environment to set for Dex.
 
 ### Dex Example
 
 !!! note
     `.spec.dex` is no longer supported in Argo CD operator v0.8.0 onwards, use `.spec.sso.dex` instead.
 
-The following examples show all properties set to the default values.
+The following examples show all properties set to the default values.  
 
 ``` yaml
 apiVersion: argoproj.io/v1alpha1
@@ -1443,7 +1506,7 @@ spec:
 
 ### Important Note regarding Role Mappings:
 
-To have a specific user be properly atrributed with the `role:admin` upon SSO through Openshift, the user needs to be in a **group** with the `cluster-admin` role added. If the user only has a direct `ClusterRoleBinding` to the Openshift role for `cluster-admin`, the ArgoCD role will not map.
+To have a specific user be properly atrributed with the `role:admin` upon SSO through Openshift, the user needs to be in a **group** with the `cluster-admin` role added. If the user only has a direct `ClusterRoleBinding` to the Openshift role for `cluster-admin`, the ArgoCD role will not map. 
 
 A quick fix will be to create an `cluster-admins` group, add the user to the group and then apply the `cluster-admin` ClusterRole to the group.
 
@@ -1612,7 +1675,7 @@ spec:
 
 ## Banner
 
-The following properties are available for configuring a [UI banner message](https://argo-cd.readthedocs.io/en/stable/operator-manual/custom-styles/#banners).
+The following properties are available for configuring a [UI banner message](https://argo-cd.readthedocs.io/en/stable/operator-manual/custom-styles/#banners). 
 
 Name | Default | Description
 --- | --- | ---

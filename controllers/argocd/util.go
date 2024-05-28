@@ -31,9 +31,6 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/argoproj/argo-cd/v2/util/glob"
-
-	"github.com/argoproj-labs/argocd-operator/api/v1alpha1"
 	argoproj "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 	"github.com/argoproj-labs/argocd-operator/common"
 	"github.com/argoproj-labs/argocd-operator/controllers/argoutil"
@@ -49,9 +46,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	v1 "k8s.io/api/rbac/v1"
-
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -63,10 +59,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-)
-
-const (
-	grafanaDeprecatedWarning = "Warning: grafana field is deprecated from ArgoCD: field will be ignored."
 )
 
 var (
@@ -138,12 +130,7 @@ func getArgoApplicationControllerCommand(cr *argoproj.ArgoCD, useTLSForRedis boo
 	cmd := []string{
 		"argocd-application-controller",
 		"--operation-processors", fmt.Sprint(getArgoServerOperationProcessors(cr)),
-	}
-
-	if cr.Spec.Redis.IsEnabled() {
-		cmd = append(cmd, "--redis", getRedisServerAddress(cr))
-	} else {
-		log.Info("Redis is Disabled. Skipping adding Redis configuration to Application Controller.")
+		"--redis", getRedisServerAddress(cr),
 	}
 
 	if useTLSForRedis {
@@ -155,12 +142,7 @@ func getArgoApplicationControllerCommand(cr *argoproj.ArgoCD, useTLSForRedis boo
 		}
 	}
 
-	if cr.Spec.Repo.IsEnabled() {
-		cmd = append(cmd, "--repo-server", getRepoServerAddress(cr))
-	} else {
-		log.Info("Repo Server is disabled. This would affect the functioning of Application Controller.")
-	}
-
+	cmd = append(cmd, "--repo-server", getRepoServerAddress(cr))
 	cmd = append(cmd, "--status-processors", fmt.Sprint(getArgoServerStatusProcessors(cr)))
 	cmd = append(cmd, "--kubectl-parallelism-limit", fmt.Sprint(getArgoControllerParellismLimit(cr)))
 
@@ -271,23 +253,6 @@ func getArgoServerHost(cr *argoproj.ArgoCD) string {
 	return host
 }
 
-// getKeycloakIngressHost will return the host for the given ArgoCD.
-func getKeycloakIngressHost(cr *argoproj.ArgoCDKeycloakSpec) string {
-	if cr != nil && len(cr.Host) > 0 {
-		return cr.Host
-	}
-	// If cr is nil or cr.Host is empty, return a default value or handle it accordingly.
-	return keycloakIngressHost
-}
-
-// getKeycloakIngressHost will return the host for the given ArgoCD.
-func getKeycloakOpenshiftHost(cr *argoproj.ArgoCDKeycloakSpec) string {
-	if cr != nil && len(cr.Host) > 0 {
-		return cr.Host
-	}
-	return ""
-}
-
 // getArgoServerResources will return the ResourceRequirements for the Argo CD server container.
 func getArgoServerResources(cr *argoproj.ArgoCD) corev1.ResourceRequirements {
 	resources := corev1.ResourceRequirements{}
@@ -345,7 +310,7 @@ func (r *ReconcileArgoCD) getArgoServerURI(cr *argoproj.ArgoCD) string {
 // getArgoServerOperationProcessors will return the numeric Operation Processors value for the ArgoCD Server.
 func getArgoServerOperationProcessors(cr *argoproj.ArgoCD) int32 {
 	op := common.ArgoCDDefaultServerOperationProcessors
-	if cr.Spec.Controller.Processors.Operation > 0 {
+	if cr.Spec.Controller.Processors.Operation > op {
 		op = cr.Spec.Controller.Processors.Operation
 	}
 	return op
@@ -354,7 +319,7 @@ func getArgoServerOperationProcessors(cr *argoproj.ArgoCD) int32 {
 // getArgoServerStatusProcessors will return the numeric Status Processors value for the ArgoCD Server.
 func getArgoServerStatusProcessors(cr *argoproj.ArgoCD) int32 {
 	sp := common.ArgoCDDefaultServerStatusProcessors
-	if cr.Spec.Controller.Processors.Status > 0 {
+	if cr.Spec.Controller.Processors.Status > sp {
 		sp = cr.Spec.Controller.Processors.Status
 	}
 	return sp
@@ -367,6 +332,38 @@ func getArgoControllerParellismLimit(cr *argoproj.ArgoCD) int32 {
 		pl = cr.Spec.Controller.ParallelismLimit
 	}
 	return pl
+}
+
+// getGrafanaContainerImage will return the container image for the Grafana server.
+func getGrafanaContainerImage(cr *argoproj.ArgoCD) string {
+	defaultTag, defaultImg := false, false
+	img := cr.Spec.Grafana.Image
+	if img == "" {
+		img = common.ArgoCDDefaultGrafanaImage
+		defaultImg = true
+	}
+
+	tag := cr.Spec.Grafana.Version
+	if tag == "" {
+		tag = common.ArgoCDDefaultGrafanaVersion
+		defaultTag = true
+	}
+	if e := os.Getenv(common.ArgoCDGrafanaImageEnvName); e != "" && (defaultTag && defaultImg) {
+		return e
+	}
+	return argoutil.CombineImageTag(img, tag)
+}
+
+// getGrafanaResources will return the ResourceRequirements for the Grafana container.
+func getGrafanaResources(cr *argoproj.ArgoCD) corev1.ResourceRequirements {
+	resources := corev1.ResourceRequirements{}
+
+	// Allow override of resource requirements from CR
+	if cr.Spec.Grafana.Resources != nil {
+		resources = *cr.Spec.Grafana.Resources
+	}
+
+	return resources
 }
 
 // getRedisConfigPath will return the path for the Redis configuration templates.
@@ -594,9 +591,6 @@ func getSentinelLivenessScript(useTLSForRedis bool) string {
 
 // getRedisServerAddress will return the Redis service address for the given ArgoCD.
 func getRedisServerAddress(cr *argoproj.ArgoCD) string {
-	if cr.Spec.Redis.Remote != nil && *cr.Spec.Redis.Remote != "" {
-		return *cr.Spec.Redis.Remote
-	}
 	if cr.Spec.HA.Enabled {
 		return getRedisHAProxyAddress(cr)
 	}
@@ -644,7 +638,7 @@ func InspectCluster() error {
 		return err
 	}
 
-	if err := verifyKeycloakTemplateAPIs(); err != nil {
+	if err := verifyTemplateAPI(); err != nil {
 		return err
 	}
 
@@ -823,8 +817,7 @@ func (r *ReconcileArgoCD) reconcileResources(cr *argoproj.ArgoCD) error {
 		}
 	}
 
-	// check ManagedApplicationSetSourceNamespaces for proper cleanup
-	if cr.Spec.ApplicationSet != nil || len(r.ManagedApplicationSetSourceNamespaces) > 0 {
+	if cr.Spec.ApplicationSet != nil {
 		log.Info("reconciling ApplicationSet controller")
 		if err := r.reconcileApplicationSetController(cr); err != nil {
 			return err
@@ -1110,14 +1103,11 @@ func (r *ReconcileArgoCD) setResourceWatches(bldr *builder.Builder, clusterResou
 		bldr.Owns(&monitoringv1.ServiceMonitor{})
 	}
 
-	if CanUseKeycloakWithTemplate() {
+	if IsTemplateAPIAvailable() {
 		// Watch for the changes to Deployment Config
 		bldr.Owns(&oappsv1.DeploymentConfig{}, builder.WithPredicates(deploymentConfigPred))
 
 	}
-
-	// Watch for changes to NotificationsConfiguration CR
-	bldr.Owns(&v1alpha1.NotificationsConfiguration{})
 
 	namespaceHandler := handler.EnqueueRequestsFromMapFunc(namespaceResourceMapper)
 
@@ -1400,25 +1390,6 @@ func (r *ReconcileArgoCD) setManagedNamespaces(cr *argoproj.ArgoCD) error {
 	return nil
 }
 
-// getSourceNamespaces retrieves a list of namespaces that match the sourceNamespaces
-// pattern specified in the given ArgoCD
-func (r *ReconcileArgoCD) getSourceNamespaces(cr *argoproj.ArgoCD) ([]string, error) {
-	sourceNamespaces := []string{}
-	namespaces := &corev1.NamespaceList{}
-
-	if err := r.Client.List(context.TODO(), namespaces, &client.ListOptions{}); err != nil {
-		return nil, err
-	}
-
-	for _, namespace := range namespaces.Items {
-		if glob.MatchStringInList(cr.Spec.SourceNamespaces, namespace.Name, false) {
-			sourceNamespaces = append(sourceNamespaces, namespace.Name)
-		}
-	}
-
-	return sourceNamespaces, nil
-}
-
 func (r *ReconcileArgoCD) setManagedSourceNamespaces(cr *argoproj.ArgoCD) error {
 	r.ManagedSourceNamespaces = make(map[string]string)
 	namespaces := &corev1.NamespaceList{}
@@ -1445,11 +1416,7 @@ func (r *ReconcileArgoCD) removeUnmanagedSourceNamespaceResources(cr *argoproj.A
 	for ns := range r.ManagedSourceNamespaces {
 		managedNamespace := false
 		if cr.GetDeletionTimestamp() == nil {
-			sourceNamespaces, err := r.getSourceNamespaces(cr)
-			if err != nil {
-				return err
-			}
-			for _, namespace := range sourceNamespaces {
+			for _, namespace := range cr.Spec.SourceNamespaces {
 				if namespace == ns {
 					managedNamespace = true
 					break
@@ -1471,7 +1438,7 @@ func (r *ReconcileArgoCD) removeUnmanagedSourceNamespaceResources(cr *argoproj.A
 func (r *ReconcileArgoCD) cleanupUnmanagedSourceNamespaceResources(cr *argoproj.ArgoCD, ns string) error {
 	namespace := corev1.Namespace{}
 	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: ns}, &namespace); err != nil {
-		if !apierrors.IsNotFound(err) {
+		if !errors.IsNotFound(err) {
 			return err
 		}
 		return nil
@@ -1486,7 +1453,7 @@ func (r *ReconcileArgoCD) cleanupUnmanagedSourceNamespaceResources(cr *argoproj.
 	existingRole := v1.Role{}
 	roleName := getRoleNameForApplicationSourceNamespaces(namespace.Name, cr)
 	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: roleName, Namespace: namespace.Name}, &existingRole); err != nil {
-		if !apierrors.IsNotFound(err) {
+		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to fetch the role for the service account associated with %s : %s", common.ArgoCDServerComponent, err)
 		}
 	}
@@ -1499,7 +1466,7 @@ func (r *ReconcileArgoCD) cleanupUnmanagedSourceNamespaceResources(cr *argoproj.
 	existingRoleBinding := &v1.RoleBinding{}
 	roleBindingName := getRoleBindingNameForSourceNamespaces(cr.Name, namespace.Name)
 	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: roleBindingName, Namespace: namespace.Name}, existingRoleBinding); err != nil {
-		if !apierrors.IsNotFound(err) {
+		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to get the rolebinding associated with %s : %s", common.ArgoCDServerComponent, err)
 		}
 	}
@@ -1636,14 +1603,10 @@ func contains(s []string, g string) bool {
 }
 
 // getApplicationSetHTTPServerHost will return the host for the given ArgoCD.
-func getApplicationSetHTTPServerHost(cr *argoproj.ArgoCD) (string, error) {
+func getApplicationSetHTTPServerHost(cr *argoproj.ArgoCD) string {
 	host := cr.Name
 	if len(cr.Spec.ApplicationSet.WebhookServer.Host) > 0 {
-		hostname, err := shortenHostname(cr.Spec.ApplicationSet.WebhookServer.Host)
-		if err != nil {
-			return "", err
-		}
-		host = hostname
+		host = cr.Spec.ApplicationSet.WebhookServer.Host
 	}
-	return host, nil
+	return host
 }

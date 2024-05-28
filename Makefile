@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.9.0
+VERSION ?= 0.8.0
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -96,7 +96,7 @@ build: generate fmt vet ## Build manager binary.
 	go build -ldflags=$(LD_FLAGS) -o bin/manager main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
-	REDIS_CONFIG_PATH="build/redis" go run -ldflags=$(LD_FLAGS) ./main.go
+	REDIS_CONFIG_PATH="build/redis" GRAFANA_CONFIG_PATH="grafana" go run -ldflags=$(LD_FLAGS) ./main.go
 
 docker-build: test ## Build docker image with the manager.
 	docker build --build-arg LD_FLAGS=$(LD_FLAGS) -t ${IMG} .
@@ -137,9 +137,11 @@ KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
 	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.2)
 
+# Pin setup env due to incompatibility between setup-envtest and controller-runtime.
+# More info: https://github.com/kubernetes-sigs/controller-runtime/issues/2744
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
-	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@bf15e44028f908c790721fc8fe67c7bf2d06a611)
 	$(ENVTEST) use 1.26
 
 # go-install-tool will 'go install' any package $2 and install it to $1.

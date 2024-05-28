@@ -630,10 +630,6 @@ spec:
                         type: integer
                     type: object
                 type: object
-              defaultClusterScopedRoleDisabled:
-                description: DefaultClusterScopedRoleDisabled will disable creation
-                  of default ClusterRoles for a cluster scoped instance.
-                type: boolean
               dex:
                 description: Deprecated field. Support dropped in v1beta1 version.
                   Dex defines the Dex server options for ArgoCD.
@@ -729,8 +725,7 @@ spec:
                 description: GATrackingID is the google analytics tracking ID to use.
                 type: string
               grafana:
-                description: 'Deprecated: Grafana defines the Grafana server options
-                  for ArgoCD.'
+                description: Grafana defines the Grafana server options for ArgoCD.
                 properties:
                   enabled:
                     description: Enabled will toggle Grafana support globally for
@@ -1063,10 +1058,6 @@ spec:
                 description: Monitoring defines whether workload status monitoring
                   configuration for this instance.
                 properties:
-                  disableMetrics:
-                    description: DisableMetrics field can be used to enable or disable
-                      the collection of Metrics on Openshift
-                    type: boolean
                   enabled:
                     description: Enabled defines whether workload status monitoring
                       is enabled for this instance or not
@@ -6701,10 +6692,6 @@ spec:
                     description: Keycloak contains the configuration for Argo CD keycloak
                       authentication
                     properties:
-                      host:
-                        description: Host is the hostname to use for Ingress/Route
-                          resources.
-                        type: string
                       image:
                         description: Image is the Keycloak container image.
                         type: string
@@ -7003,10 +6990,6 @@ spec:
                 description: ArgoCDApplicationSet defines whether the Argo CD ApplicationSet
                   controller should be installed.
                 properties:
-                  enabled:
-                    description: Enabled is the flag to enable the Application Set
-                      Controller during ArgoCD installation. (optional, default `true`)
-                    type: boolean
                   env:
                     description: Env lets you specify environment for applicationSet
                       controller pods
@@ -7185,23 +7168,11 @@ spec:
                           Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                         type: object
                     type: object
-                  scmProviders:
-                    description: SCMProviders defines the list of allowed custom SCM
-                      provider API URLs
-                    items:
-                      type: string
-                    type: array
                   scmRootCAConfigMap:
                     description: SCMRootCAConfigMap is the name of the config map
                       that stores the Gitlab SCM Provider's TLS certificate which
                       will be mounted on the ApplicationSet Controller (optional).
                     type: string
-                  sourceNamespaces:
-                    description: SourceNamespaces defines the namespaces applicationset
-                      resources are allowed to be created in
-                    items:
-                      type: string
-                    type: array
                   version:
                     description: Version is the Argo CD ApplicationSet image tag.
                       (optional)
@@ -7371,10 +7342,6 @@ spec:
                       to a duration, e.g. 10m or 600s to control the synchronisation
                       frequency."
                     type: string
-                  enabled:
-                    description: Enabled is the flag to enable the Application Controller
-                      during ArgoCD installation. (optional, default `true`)
-                    type: boolean
                   env:
                     description: Env lets you specify environment for application
                       controller pods
@@ -7601,10 +7568,6 @@ spec:
                         type: integer
                     type: object
                 type: object
-              defaultClusterScopedRoleDisabled:
-                description: DefaultClusterScopedRoleDisabled will disable creation
-                  of default ClusterRoles for a cluster scoped instance.
-                type: boolean
               disableAdmin:
                 description: DisableAdmin will disable the admin user.
                 type: boolean
@@ -7626,8 +7589,7 @@ spec:
                 description: GATrackingID is the google analytics tracking ID to use.
                 type: string
               grafana:
-                description: 'Deprecated: Grafana defines the Grafana server options
-                  for ArgoCD.'
+                description: Grafana defines the Grafana server options for ArgoCD.
                 properties:
                   enabled:
                     description: Enabled will toggle Grafana support globally for
@@ -7960,10 +7922,6 @@ spec:
                 description: Monitoring defines whether workload status monitoring
                   configuration for this instance.
                 properties:
-                  disableMetrics:
-                    description: DisableMetrics field can be used to enable or disable
-                      the collection of Metrics on Openshift
-                    type: boolean
                   enabled:
                     description: Enabled defines whether workload status monitoring
                       is enabled for this instance or not
@@ -8400,17 +8358,8 @@ spec:
                     description: DisableTLSVerification defines whether redis server
                       API should be accessed using strict TLS validation
                     type: boolean
-                  enabled:
-                    description: Enabled is the flag to enable Redis during ArgoCD
-                      installation. (optional, default `true`)
-                    type: boolean
                   image:
                     description: Image is the Redis container image.
-                    type: string
-                  remote:
-                    description: Remote specifies the remote URL of the Redis container.
-                      (optional, by default, a local instance managed by the operator
-                      is used.)
                     type: string
                   resources:
                     description: Resources defines the Compute Resources required
@@ -8475,10 +8424,6 @@ spec:
                       can currently be: - openshift - Use the OpenShift service CA
                       to request TLS config'
                     type: string
-                  enabled:
-                    description: Enabled is the flag to enable Repo Server during
-                      ArgoCD installation. (optional, default `true`)
-                    type: boolean
                   env:
                     description: Env lets you specify environment for repo server
                       pods
@@ -9937,11 +9882,6 @@ spec:
                     description: MountSAToken describes whether you would like to
                       have the Repo server mount the service account token
                     type: boolean
-                  remote:
-                    description: Remote specifies the remote URL of the Repo Server
-                      container. (optional, by default, a local instance managed by
-                      the operator is used.)
-                    type: string
                   replicas:
                     description: Replicas defines the number of replicas for argocd-repo-server.
                       Value should be greater than or equal to 0. Default is nil.
@@ -13127,10 +13067,6 @@ spec:
                     required:
                     - enabled
                     type: object
-                  enabled:
-                    description: Enabled is the flag to enable ArgoCD Server during
-                      ArgoCD installation. (optional, default `true`)
-                    type: boolean
                   env:
                     description: Env lets you specify environment for API server pods
                     items:
@@ -13538,121 +13474,6 @@ spec:
                       config:
                         description: Config is the dex connector configuration.
                         type: string
-                      env:
-                        description: Env lets you specify environment variables for
-                          Dex.
-                        items:
-                          description: EnvVar represents an environment variable present
-                            in a Container.
-                          properties:
-                            name:
-                              description: Name of the environment variable. Must
-                                be a C_IDENTIFIER.
-                              type: string
-                            value:
-                              description: 'Variable references $(VAR_NAME) are expanded
-                                using the previously defined environment variables
-                                in the container and any service environment variables.
-                                If a variable cannot be resolved, the reference in
-                                the input string will be unchanged. Double $$ are
-                                reduced to a single $, which allows for escaping the
-                                $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce
-                                the string literal "$(VAR_NAME)". Escaped references
-                                will never be expanded, regardless of whether the
-                                variable exists or not. Defaults to "".'
-                              type: string
-                            valueFrom:
-                              description: Source for the environment variable's value.
-                                Cannot be used if value is not empty.
-                              properties:
-                                configMapKeyRef:
-                                  description: Selects a key of a ConfigMap.
-                                  properties:
-                                    key:
-                                      description: The key to select.
-                                      type: string
-                                    name:
-                                      description: 'Name of the referent. More info:
-                                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion,
-                                        kind, uid?'
-                                      type: string
-                                    optional:
-                                      description: Specify whether the ConfigMap or
-                                        its key must be defined
-                                      type: boolean
-                                  required:
-                                  - key
-                                  type: object
-                                fieldRef:
-                                  description: 'Selects a field of the pod: supports
-                                    metadata.name, metadata.namespace, `metadata.labels[''<KEY>'']`,
-                                    `metadata.annotations[''<KEY>'']`, spec.nodeName,
-                                    spec.serviceAccountName, status.hostIP, status.podIP,
-                                    status.podIPs.'
-                                  properties:
-                                    apiVersion:
-                                      description: Version of the schema the FieldPath
-                                        is written in terms of, defaults to "v1".
-                                      type: string
-                                    fieldPath:
-                                      description: Path of the field to select in
-                                        the specified API version.
-                                      type: string
-                                  required:
-                                  - fieldPath
-                                  type: object
-                                resourceFieldRef:
-                                  description: 'Selects a resource of the container:
-                                    only resources limits and requests (limits.cpu,
-                                    limits.memory, limits.ephemeral-storage, requests.cpu,
-                                    requests.memory and requests.ephemeral-storage)
-                                    are currently supported.'
-                                  properties:
-                                    containerName:
-                                      description: 'Container name: required for volumes,
-                                        optional for env vars'
-                                      type: string
-                                    divisor:
-                                      anyOf:
-                                      - type: integer
-                                      - type: string
-                                      description: Specifies the output format of
-                                        the exposed resources, defaults to "1"
-                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                      x-kubernetes-int-or-string: true
-                                    resource:
-                                      description: 'Required: resource to select'
-                                      type: string
-                                  required:
-                                  - resource
-                                  type: object
-                                secretKeyRef:
-                                  description: Selects a key of a secret in the pod's
-                                    namespace
-                                  properties:
-                                    key:
-                                      description: The key of the secret to select
-                                        from.  Must be a valid secret key.
-                                      type: string
-                                    name:
-                                      description: 'Name of the referent. More info:
-                                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                        TODO: Add other useful fields. apiVersion,
-                                        kind, uid?'
-                                      type: string
-                                    optional:
-                                      description: Specify whether the Secret or its
-                                        key must be defined
-                                      type: boolean
-                                  required:
-                                  - key
-                                  type: object
-                              type: object
-                          required:
-                          - name
-                          type: object
-                        type: array
                       groups:
                         description: Optional list of required groups a user must
                           be a member of
@@ -13724,10 +13545,6 @@ spec:
                     description: Keycloak contains the configuration for Argo CD keycloak
                       authentication
                     properties:
-                      host:
-                        description: Host is the hostname to use for Ingress/Route
-                          resources.
-                        type: string
                       image:
                         description: Image is the Keycloak container image.
                         type: string

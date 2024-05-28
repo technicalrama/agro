@@ -17,7 +17,10 @@ package argocd
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
@@ -155,10 +158,7 @@ func getResourceHealthChecks(cr *argoproj.ArgoCD) map[string]string {
 	if cr.Spec.ResourceHealthChecks != nil {
 		resourceHealthChecks := cr.Spec.ResourceHealthChecks
 		for _, healthCustomization := range resourceHealthChecks {
-			if healthCustomization.Group != "" {
-				healthCustomization.Group += "_"
-			}
-			subkey := "resource.customizations.health." + healthCustomization.Group + healthCustomization.Kind
+			subkey := "resource.customizations.health." + healthCustomization.Group + "_" + healthCustomization.Kind
 			subvalue := healthCustomization.Check
 			healthCheck[subkey] = subvalue
 		}
@@ -181,10 +181,7 @@ func getResourceIgnoreDifferences(cr *argoproj.ArgoCD) (map[string]string, error
 			ignoreDiff[subkey] = subvalue
 		}
 		for _, ignoreDiffCustomization := range resourceIgnoreDiff.ResourceIdentifiers {
-			if ignoreDiffCustomization.Group != "" {
-				ignoreDiffCustomization.Group += "_"
-			}
-			subkey := "resource.customizations.ignoreDifferences." + ignoreDiffCustomization.Group + ignoreDiffCustomization.Kind
+			subkey := "resource.customizations.ignoreDifferences." + ignoreDiffCustomization.Group + "_" + ignoreDiffCustomization.Kind
 			bytes, err := yaml.Marshal(ignoreDiffCustomization.Customization)
 			if err != nil {
 				return ignoreDiff, err
@@ -202,10 +199,7 @@ func getResourceActions(cr *argoproj.ArgoCD) map[string]string {
 	if cr.Spec.ResourceActions != nil {
 		resourceAction := cr.Spec.ResourceActions
 		for _, actionCustomization := range resourceAction {
-			if actionCustomization.Group != "" {
-				actionCustomization.Group += "_"
-			}
-			subkey := "resource.customizations.actions." + actionCustomization.Group + actionCustomization.Kind
+			subkey := "resource.customizations.actions." + actionCustomization.Group + "_" + actionCustomization.Kind
 			subvalue := actionCustomization.Action
 			action[subkey] = subvalue
 		}
@@ -304,6 +298,12 @@ func newConfigMapWithName(name string, cr *argoproj.ArgoCD) *corev1.ConfigMap {
 	cm.ObjectMeta.Labels = lbls
 
 	return cm
+}
+
+// newConfigMapWithName creates a new ConfigMap with the given suffix appended to the name.
+// The name for the CongifMap is based on the name of the given ArgCD.
+func newConfigMapWithSuffix(suffix string, cr *argoproj.ArgoCD) *corev1.ConfigMap {
+	return newConfigMapWithName(fmt.Sprintf("%s-%s", cr.ObjectMeta.Name, suffix), cr)
 }
 
 // reconcileConfigMaps will ensure that all ArgoCD ConfigMaps are present.
@@ -419,8 +419,9 @@ func (r *ReconcileArgoCD) reconcileArgoConfigMap(cr *argoproj.ArgoCD) error {
 	if UseDex(cr) {
 		dexConfig := getDexConfig(cr)
 
-		// Append the default OpenShift dex config if the openShiftOAuth is requested through `.spec.sso.dex`.
-		if cr.Spec.SSO != nil && cr.Spec.SSO.Dex != nil && cr.Spec.SSO.Dex.OpenShiftOAuth {
+		// If no dexConfig expressed but openShiftOAuth is requested through `.spec.sso.dex`, use default
+		// openshift dex config
+		if dexConfig == "" && (cr.Spec.SSO != nil && cr.Spec.SSO.Dex != nil && cr.Spec.SSO.Dex.OpenShiftOAuth) {
 			cfg, err := r.getOpenShiftDexConfig(cr)
 			if err != nil {
 				return err
@@ -480,9 +481,44 @@ func (r *ReconcileArgoCD) reconcileGrafanaConfiguration(cr *argoproj.ArgoCD) err
 		return nil // Grafana not enabled, do nothing.
 	}
 
-	log.Info(grafanaDeprecatedWarning)
+	cm := newConfigMapWithSuffix(common.ArgoCDGrafanaConfigMapSuffix, cr)
+	if argoutil.IsObjectFound(r.Client, cr.Namespace, cm.Name, cm) {
+		return nil // ConfigMap found, do nothing
+	}
 
-	return nil
+	secret := argoutil.NewSecretWithSuffix(cr, "grafana")
+	secret, err := argoutil.FetchSecret(r.Client, cr.ObjectMeta, secret.Name)
+	if err != nil {
+		return err
+	}
+
+	grafanaConfig := GrafanaConfig{
+		Security: GrafanaSecurityConfig{
+			AdminUser:     string(secret.Data[common.ArgoCDKeyGrafanaAdminUsername]),
+			AdminPassword: string(secret.Data[common.ArgoCDKeyGrafanaAdminPassword]),
+			SecretKey:     string(secret.Data[common.ArgoCDKeyGrafanaSecretKey]),
+		},
+	}
+
+	data, err := loadGrafanaConfigs()
+	if err != nil {
+		return err
+	}
+
+	tmpls, err := loadGrafanaTemplates(&grafanaConfig)
+	if err != nil {
+		return err
+	}
+
+	for key, val := range tmpls {
+		data[key] = val
+	}
+	cm.Data = data
+
+	if err := controllerutil.SetControllerReference(cr, cm, r.Scheme); err != nil {
+		return err
+	}
+	return r.Client.Create(context.TODO(), cm)
 }
 
 // reconcileGrafanaDashboards will ensure that the Grafana dashboards ConfigMap is present.
@@ -491,9 +527,34 @@ func (r *ReconcileArgoCD) reconcileGrafanaDashboards(cr *argoproj.ArgoCD) error 
 		return nil // Grafana not enabled, do nothing.
 	}
 
-	log.Info(grafanaDeprecatedWarning)
+	cm := newConfigMapWithSuffix(common.ArgoCDGrafanaDashboardConfigMapSuffix, cr)
+	if argoutil.IsObjectFound(r.Client, cr.Namespace, cm.Name, cm) {
+		return nil // ConfigMap found, do nothing
+	}
 
-	return nil
+	pattern := filepath.Join(getGrafanaConfigPath(), "dashboards/*.json")
+	dashboards, err := filepath.Glob(pattern)
+	if err != nil {
+		return err
+	}
+
+	data := make(map[string]string)
+	for _, f := range dashboards {
+		dashboard, err := os.ReadFile(f)
+		if err != nil {
+			return err
+		}
+
+		parts := strings.Split(f, "/")
+		filename := parts[len(parts)-1]
+		data[filename] = string(dashboard)
+	}
+	cm.Data = data
+
+	if err := controllerutil.SetControllerReference(cr, cm, r.Scheme); err != nil {
+		return err
+	}
+	return r.Client.Create(context.TODO(), cm)
 }
 
 // reconcileRBAC will ensure that the ArgoCD RBAC ConfigMap is present.

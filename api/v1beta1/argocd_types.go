@@ -108,13 +108,6 @@ type ArgoCDApplicationControllerSpec struct {
 
 	// Env lets you specify environment for application controller pods
 	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// Enabled is the flag to enable the Application Controller during ArgoCD installation. (optional, default `true`)
-	Enabled *bool `json:"enabled,omitempty"`
-}
-
-func (a *ArgoCDApplicationControllerSpec) IsEnabled() bool {
-	return a.Enabled == nil || (a.Enabled != nil && *a.Enabled)
 }
 
 // ArgoCDApplicationControllerShardSpec defines the options available for enabling sharding for the Application Controller component.
@@ -169,19 +162,6 @@ type ArgoCDApplicationSet struct {
 
 	// SCMRootCAConfigMap is the name of the config map that stores the Gitlab SCM Provider's TLS certificate which will be mounted on the ApplicationSet Controller (optional).
 	SCMRootCAConfigMap string `json:"scmRootCAConfigMap,omitempty"`
-
-	// Enabled is the flag to enable the Application Set Controller during ArgoCD installation. (optional, default `true`)
-	Enabled *bool `json:"enabled,omitempty"`
-
-	// SourceNamespaces defines the namespaces applicationset resources are allowed to be created in
-	SourceNamespaces []string `json:"sourceNamespaces,omitempty"`
-
-	// SCMProviders defines the list of allowed custom SCM provider API URLs
-	SCMProviders []string `json:"scmProviders,omitempty"`
-}
-
-func (a *ArgoCDApplicationSet) IsEnabled() bool {
-	return a.Enabled == nil || (a.Enabled != nil && *a.Enabled)
 }
 
 // ArgoCDCASpec defines the CA options for ArgCD.
@@ -223,9 +203,6 @@ type ArgoCDDexSpec struct {
 	// Version is the Dex container image tag.
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Version",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldGroup:Dex","urn:alm:descriptor:com.tectonic.ui:text"}
 	Version string `json:"version,omitempty"`
-
-	// Env lets you specify environment variables for Dex.
-	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
 // ArgoCDGrafanaSpec defines the desired state for the Grafana component.
@@ -328,9 +305,6 @@ type ArgoCDKeycloakSpec struct {
 
 	// VerifyTLS set to false disables strict TLS validation.
 	VerifyTLS *bool `json:"verifyTLS,omitempty"`
-
-	// Host is the hostname to use for Ingress/Route resources.
-	Host string `json:"host,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -436,16 +410,6 @@ type ArgoCDRedisSpec struct {
 	// The value specified here can currently be:
 	// - openshift - Use the OpenShift service CA to request TLS config
 	AutoTLS string `json:"autotls,omitempty"`
-
-	// Enabled is the flag to enable Redis during ArgoCD installation. (optional, default `true`)
-	Enabled *bool `json:"enabled,omitempty"`
-
-	// Remote specifies the remote URL of the Redis container. (optional, by default, a local instance managed by the operator is used.)
-	Remote *string `json:"remote,omitempty"`
-}
-
-func (a *ArgoCDRedisSpec) IsEnabled() bool {
-	return a.Enabled == nil || (a.Enabled != nil && *a.Enabled)
 }
 
 // ArgoCDRepoSpec defines the desired state for the Argo CD repo server component.
@@ -506,16 +470,6 @@ type ArgoCDRepoSpec struct {
 
 	// SidecarContainers defines the list of sidecar containers for the repo server deployment
 	SidecarContainers []corev1.Container `json:"sidecarContainers,omitempty"`
-
-	// Enabled is the flag to enable Repo Server during ArgoCD installation. (optional, default `true`)
-	Enabled *bool `json:"enabled,omitempty"`
-
-	// Remote specifies the remote URL of the Repo Server container. (optional, by default, a local instance managed by the operator is used.)
-	Remote *string `json:"remote,omitempty"`
-}
-
-func (a *ArgoCDRepoSpec) IsEnabled() bool {
-	return a.Enabled == nil || (a.Enabled != nil && *a.Enabled)
 }
 
 // ArgoCDRouteSpec defines the desired state for an OpenShift Route.
@@ -606,13 +560,6 @@ type ArgoCDServerSpec struct {
 	// ExtraCommandArgs will not be added, if one of these commands is already part of the server command
 	// with same or different value.
 	ExtraCommandArgs []string `json:"extraCommandArgs,omitempty"`
-
-	// Enabled is the flag to enable ArgoCD Server during ArgoCD installation. (optional, default `true`)
-	Enabled *bool `json:"enabled,omitempty"`
-}
-
-func (a *ArgoCDServerSpec) IsEnabled() bool {
-	return a.Enabled == nil || (a.Enabled != nil && *a.Enabled)
 }
 
 // ArgoCDServerServiceSpec defines the Service options for Argo CD Server component.
@@ -694,8 +641,6 @@ type KustomizeVersionSpec struct {
 type ArgoCDMonitoringSpec struct {
 	// Enabled defines whether workload status monitoring is enabled for this instance or not
 	Enabled bool `json:"enabled"`
-	// DisableMetrics field can be used to enable or disable the collection of Metrics on Openshift
-	DisableMetrics *bool `json:"disableMetrics,omitempty"`
 }
 
 // ArgoCDNodePlacementSpec is used to specify NodeSelector and Tolerations for Argo CD workloads
@@ -743,7 +688,7 @@ type ArgoCDSpec struct {
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Google Analytics Anonymize Users'",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch","urn:alm:descriptor:com.tectonic.ui:advanced"}
 	GAAnonymizeUsers bool `json:"gaAnonymizeUsers,omitempty"`
 
-	// Deprecated: Grafana defines the Grafana server options for ArgoCD.
+	// Grafana defines the Grafana server options for ArgoCD.
 	Grafana ArgoCDGrafanaSpec `json:"grafana,omitempty"`
 
 	// HA options for High Availability support for the Redis component.
@@ -857,9 +802,6 @@ type ArgoCDSpec struct {
 
 	// Banner defines an additional banner to be displayed in Argo CD UI
 	Banner *Banner `json:"banner,omitempty"`
-
-	// DefaultClusterScopedRoleDisabled will disable creation of default ClusterRoles for a cluster scoped instance.
-	DefaultClusterScopedRoleDisabled bool `json:"defaultClusterScopedRoleDisabled,omitempty"`
 }
 
 // ArgoCDStatus defines the observed state of ArgoCD
@@ -999,11 +941,10 @@ func (argocd *ArgoCD) IsDeletionFinalizerPresent() bool {
 	return false
 }
 
-// WantsAutoTLS returns true if:
-// 1. user has configured a route with reencrypt.
-// 2. user has not configured TLS and we default to reencrypt.
+// WantsAutoTLS returns true if user configured a route with reencryption
+// termination policy.
 func (s *ArgoCDServerSpec) WantsAutoTLS() bool {
-	return s.Route.TLS == nil || s.Route.TLS.Termination == routev1.TLSTerminationReencrypt
+	return s.Route.TLS != nil && s.Route.TLS.Termination == routev1.TLSTerminationReencrypt
 }
 
 // WantsAutoTLS returns true if the repository server configuration has set

@@ -26,8 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "k8s.io/api/apps/v1"
-
 	argoproj "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 	"github.com/argoproj-labs/argocd-operator/controllers/argoutil"
 )
@@ -106,14 +104,6 @@ func (r *ReconcileArgoCD) reconcileStatusDex(cr *argoproj.ArgoCD) error {
 		if deploy.Spec.Replicas != nil {
 			if deploy.Status.ReadyReplicas == *deploy.Spec.Replicas {
 				status = "Running"
-			} else if deploy.Status.Conditions != nil {
-				for _, condition := range deploy.Status.Conditions {
-					if condition.Type == appsv1.DeploymentReplicaFailure && condition.Status == corev1.ConditionTrue {
-						// Deployment has failed
-						status = "Failed"
-						break
-					}
-				}
 			}
 		}
 	}
@@ -130,7 +120,7 @@ func (r *ReconcileArgoCD) reconcileStatusDex(cr *argoproj.ArgoCD) error {
 func (r *ReconcileArgoCD) reconcileStatusKeycloak(cr *argoproj.ArgoCD) error {
 	status := "Unknown"
 
-	if CanUseKeycloakWithTemplate() {
+	if IsTemplateAPIAvailable() {
 		// keycloak is installed using OpenShift templates.
 		dc := &oappsv1.DeploymentConfig{
 			ObjectMeta: metav1.ObjectMeta{
@@ -143,14 +133,6 @@ func (r *ReconcileArgoCD) reconcileStatusKeycloak(cr *argoproj.ArgoCD) error {
 
 			if dc.Status.ReadyReplicas == dc.Spec.Replicas {
 				status = "Running"
-			} else if dc.Status.Conditions != nil {
-				for _, condition := range dc.Status.Conditions {
-					if condition.Type == oappsv1.DeploymentReplicaFailure && condition.Status == corev1.ConditionTrue {
-						// Deployment has failed
-						status = "Failed"
-						break
-					}
-				}
 			}
 		}
 
@@ -162,16 +144,7 @@ func (r *ReconcileArgoCD) reconcileStatusKeycloak(cr *argoproj.ArgoCD) error {
 			if d.Spec.Replicas != nil {
 				if d.Status.ReadyReplicas == *d.Spec.Replicas {
 					status = "Running"
-				} else if d.Status.Conditions != nil {
-					for _, condition := range d.Status.Conditions {
-						if condition.Type == appsv1.DeploymentReplicaFailure && condition.Status == corev1.ConditionTrue {
-							// Deployment has failed
-							status = "Failed"
-							break
-						}
-					}
 				}
-
 			}
 		}
 	}
@@ -195,14 +168,6 @@ func (r *ReconcileArgoCD) reconcileStatusApplicationSetController(cr *argoproj.A
 		if deploy.Spec.Replicas != nil {
 			if deploy.Status.ReadyReplicas == *deploy.Spec.Replicas {
 				status = "Running"
-			} else if deploy.Status.Conditions != nil {
-				for _, condition := range deploy.Status.Conditions {
-					if condition.Type == appsv1.DeploymentReplicaFailure && condition.Status == corev1.ConditionTrue {
-						// Deployment has failed
-						status = "Failed"
-						break
-					}
-				}
 			}
 		}
 	}
@@ -242,10 +207,7 @@ func (r *ReconcileArgoCD) reconcileStatusSSO(cr *argoproj.ArgoCD) error {
 func (r *ReconcileArgoCD) reconcileStatusPhase(cr *argoproj.ArgoCD) error {
 	var phase string
 
-	if ((!cr.Spec.Controller.IsEnabled() && cr.Status.ApplicationController == "Unknown") || cr.Status.ApplicationController == "Running") &&
-		((!cr.Spec.Redis.IsEnabled() && cr.Status.Redis == "Unknown") || cr.Status.Redis == "Running" || (cr.Spec.Redis.IsEnabled() && cr.Spec.Redis.Remote != nil && *cr.Spec.Redis.Remote != "")) &&
-		((!cr.Spec.Repo.IsEnabled() && cr.Status.Repo == "Unknown") || cr.Status.Repo == "Running") &&
-		((!cr.Spec.Server.IsEnabled() && cr.Status.Server == "Unknown") || cr.Status.Server == "Running") {
+	if cr.Status.ApplicationController == "Running" && cr.Status.Redis == "Running" && cr.Status.Repo == "Running" && cr.Status.Server == "Running" {
 		phase = "Available"
 	} else {
 		phase = "Pending"
@@ -270,14 +232,6 @@ func (r *ReconcileArgoCD) reconcileStatusRedis(cr *argoproj.ArgoCD) error {
 			if deploy.Spec.Replicas != nil {
 				if deploy.Status.ReadyReplicas == *deploy.Spec.Replicas {
 					status = "Running"
-				} else if deploy.Status.Conditions != nil {
-					for _, condition := range deploy.Status.Conditions {
-						if condition.Type == appsv1.DeploymentReplicaFailure && condition.Status == corev1.ConditionTrue {
-							// Deployment has failed
-							status = "Failed"
-							break
-						}
-					}
 				}
 			}
 		}
@@ -311,14 +265,6 @@ func (r *ReconcileArgoCD) reconcileStatusRepo(cr *argoproj.ArgoCD) error {
 		if deploy.Spec.Replicas != nil {
 			if deploy.Status.ReadyReplicas == *deploy.Spec.Replicas {
 				status = "Running"
-			} else if deploy.Status.Conditions != nil {
-				for _, condition := range deploy.Status.Conditions {
-					if condition.Type == appsv1.DeploymentReplicaFailure && condition.Status == corev1.ConditionTrue {
-						// Deployment has failed
-						status = "Failed"
-						break
-					}
-				}
 			}
 		}
 	}
@@ -342,14 +288,6 @@ func (r *ReconcileArgoCD) reconcileStatusServer(cr *argoproj.ArgoCD) error {
 		if deploy.Spec.Replicas != nil {
 			if deploy.Status.ReadyReplicas == *deploy.Spec.Replicas {
 				status = "Running"
-			} else if deploy.Status.Conditions != nil {
-				for _, condition := range deploy.Status.Conditions {
-					if condition.Type == appsv1.DeploymentReplicaFailure && condition.Status == corev1.ConditionTrue {
-						// Deployment has failed
-						status = "Failed"
-						break
-					}
-				}
 			}
 		}
 	}
@@ -372,14 +310,6 @@ func (r *ReconcileArgoCD) reconcileStatusNotifications(cr *argoproj.ArgoCD) erro
 		if deploy.Spec.Replicas != nil {
 			if deploy.Status.ReadyReplicas == *deploy.Spec.Replicas {
 				status = "Running"
-			} else if deploy.Status.Conditions != nil {
-				for _, condition := range deploy.Status.Conditions {
-					if condition.Type == appsv1.DeploymentReplicaFailure && condition.Status == corev1.ConditionTrue {
-						// Deployment has failed
-						status = "Failed"
-						break
-					}
-				}
 			}
 		}
 	}

@@ -65,9 +65,8 @@ func TestReconcileArgoCD_reconcileStatusKeycloak_OpenShift(t *testing.T) {
 
 	assert.NoError(t, createNamespace(r, a.Namespace, ""))
 
-	assert.NoError(t, oappsv1.Install(r.Scheme))
+	assert.NoError(t, oappsv1.AddToScheme(r.Scheme))
 	templateAPIFound = true
-	deploymentConfigAPIFound = true
 	defer removeTemplateAPI()
 
 	dc := getKeycloakDeploymentConfigTemplate(a)
@@ -108,25 +107,9 @@ func TestReconcileArgoCD_reconcileStatusSSO(t *testing.T) {
 			argoCD: makeTestArgoCD(func(cr *argoproj.ArgoCD) {
 				cr.Spec.SSO = &argoproj.ArgoCDSSOSpec{
 					Provider: argoproj.SSOProviderTypeKeycloak,
-					Keycloak: &argoproj.ArgoCDKeycloakSpec{
-						Host: "sso.test.example.com",
-					},
 					Dex: &argoproj.ArgoCDDexSpec{
 						OpenShiftOAuth: true,
 					},
-				}
-			}),
-			wantSSOStatus: "Failed",
-		},
-		{
-			name: "both dex and keycloak configured, and keycloak host is empty",
-			argoCD: makeTestArgoCD(func(cr *argoproj.ArgoCD) {
-				cr.Spec.SSO = &argoproj.ArgoCDSSOSpec{
-					Provider: argoproj.SSOProviderTypeKeycloak,
-					Dex: &argoproj.ArgoCDDexSpec{
-						OpenShiftOAuth: true,
-					},
-					Keycloak: &argoproj.ArgoCDKeycloakSpec{},
 				}
 			}),
 			wantSSOStatus: "Failed",
@@ -272,7 +255,7 @@ func TestReconcileArgoCD_reconcileStatusHost(t *testing.T) {
 			resObjs := []client.Object{a}
 			subresObjs := []client.Object{a}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme, configv1.Install, routev1.Install)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, configv1.AddToScheme, routev1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch)
 

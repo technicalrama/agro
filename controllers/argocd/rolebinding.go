@@ -220,11 +220,7 @@ func (r *ReconcileArgoCD) reconcileRoleBinding(name string, rules []v1.PolicyRul
 	if name == common.ArgoCDServerComponent {
 
 		// reconcile rolebindings for all source namespaces for argocd-server
-		sourceNamespaces, err := r.getSourceNamespaces(cr)
-		if err != nil {
-			return err
-		}
-		for _, sourceNamespace := range sourceNamespaces {
+		for _, sourceNamespace := range cr.Spec.SourceNamespaces {
 			namespace := &corev1.Namespace{}
 			if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: sourceNamespace}, namespace); err != nil {
 				return err
@@ -272,18 +268,18 @@ func (r *ReconcileArgoCD) reconcileRoleBinding(name string, rules []v1.PolicyRul
 				{
 					Kind:      v1.ServiceAccountKind,
 					Name:      getServiceAccountName(cr.Name, common.ArgoCDServerComponent),
-					Namespace: cr.Namespace,
+					Namespace: sa.Namespace,
 				},
 				{
 					Kind:      v1.ServiceAccountKind,
 					Name:      getServiceAccountName(cr.Name, common.ArgoCDApplicationControllerComponent),
-					Namespace: cr.Namespace,
+					Namespace: sa.Namespace,
 				},
 			}
 
 			if roleBindingExists {
 				// reconcile role bindings for namespaces already containing managed-by-cluster-argocd label only
-				if n, ok := namespace.Labels[common.ArgoCDManagedByClusterArgoCDLabel]; !ok || n != cr.Namespace {
+				if n, ok := namespace.Labels[common.ArgoCDManagedByClusterArgoCDLabel]; !ok || n == cr.Namespace {
 					continue
 				}
 				// if the RoleRef changes, delete the existing role binding and create a new one
@@ -339,23 +335,6 @@ func newRoleBindingWithNameForApplicationSourceNamespaces(namespace string, cr *
 }
 
 func (r *ReconcileArgoCD) reconcileClusterRoleBinding(name string, role *v1.ClusterRole, cr *argoproj.ArgoCD) error {
-
-	// Check if user doesn't want to use default ClusterRole, hence default ClusterRoleBinding is also not required
-	if cr.Spec.DefaultClusterScopedRoleDisabled {
-
-		// In case DefaultClusterScopedRoleDisabled was false earlier and default ClusterRoleBinding was created, then delete it.
-		existingClusterRoleBinding := &v1.ClusterRoleBinding{}
-		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: GenerateUniqueResourceName(name, cr)}, existingClusterRoleBinding); err == nil {
-
-			// Default ClusterRoleBinding exists, now delete it
-			if err := r.Client.Delete(context.TODO(), existingClusterRoleBinding); err != nil {
-				return fmt.Errorf("failed to delete existing cluster role binding for the service account associated with %s : %s", name, err)
-			}
-		}
-
-		// Don't create a default ClusterRoleBinding
-		return nil
-	}
 
 	// get expected name
 	roleBinding := newClusterRoleBindingWithname(name, cr)

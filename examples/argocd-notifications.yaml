@@ -1,16 +1,10 @@
-apiVersion: argoproj.io/v1beta1
+apiVersion: argoproj.io/v1alpha1
 kind: ArgoCD
 metadata:
   name: example-argocd
-  labels:
-    example: route
 spec:
   notifications:
-    enabled: true
-  prometheus:
-    enabled: true
-    route:
-      enabled: true
+    enabled: True
   server:
-    route:
+    ingress:
       enabled: true

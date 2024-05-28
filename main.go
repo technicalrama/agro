@@ -24,7 +24,6 @@ import (
 	goruntime "runtime"
 	"strings"
 
-	"github.com/argoproj/argo-cd/v2/util/env"
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "github.com/openshift/api/apps/v1"
 	configv1 "github.com/openshift/api/config/v1"
@@ -43,14 +42,10 @@ import (
 
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	notificationsConfig "github.com/argoproj-labs/argocd-operator/controllers/notificationsconfiguration"
-
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"go.uber.org/zap/zapcore"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -88,40 +83,19 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
-	var labelSelectorFlag string
 
 	var secureMetrics = false
 	var enableHTTP2 = false
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", fmt.Sprintf(":%d", common.OperatorMetricsPort), "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.StringVar(&labelSelectorFlag, "label-selector", env.StringFromEnv(common.ArgoCDLabelSelectorKey, common.ArgoCDDefaultLabelSelector), "The label selector is used to map to a subset of ArgoCD instances to reconcile")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", enableHTTP2, "If HTTP/2 should be enabled for the metrics and webhook servers.")
 	flag.BoolVar(&secureMetrics, "metrics-secure", secureMetrics, "If the metrics endpoint should be served securely.")
 
-	//Configure log level
-	logLevelStr := strings.ToLower(os.Getenv("LOG_LEVEL"))
-	logLevel := zapcore.InfoLevel
-	switch logLevelStr {
-	case "debug":
-		logLevel = zapcore.DebugLevel
-	case "info":
-		logLevel = zapcore.InfoLevel
-	case "warn":
-		logLevel = zapcore.WarnLevel
-	case "error":
-		logLevel = zapcore.ErrorLevel
-	case "panic":
-		logLevel = zapcore.PanicLevel
-	case "fatal":
-		logLevel = zapcore.FatalLevel
-	}
-
 	opts := zap.Options{
-		Level:       logLevel,
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
@@ -148,13 +122,6 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	printVersion()
-
-	// Check the label selector format eg. "foo=bar"
-	if _, err := labels.Parse(labelSelectorFlag); err != nil {
-		setupLog.Error(err, "error parsing the labelSelector '%s'.", labelSelectorFlag)
-		os.Exit(1)
-	}
-	setupLog.Info(fmt.Sprintf("Watching labelselector \"%s\"", labelSelectorFlag))
 
 	// Inspect cluster to verify availability of extra features
 	if err := argocd.InspectCluster(); err != nil {
@@ -227,8 +194,7 @@ func main() {
 	}
 
 	// Setup Schemes for SSO if template instance is available.
-	if argocd.CanUseKeycloakWithTemplate() {
-		setupLog.Info("Keycloak instance can be managed using OpenShift Template")
+	if argocd.IsTemplateAPIAvailable() {
 		if err := templatev1.Install(mgr.GetScheme()); err != nil {
 			setupLog.Error(err, "")
 			os.Exit(1)
@@ -241,14 +207,11 @@ func main() {
 			setupLog.Error(err, "")
 			os.Exit(1)
 		}
-	} else {
-		setupLog.Info("Keycloak instance cannot be managed using OpenShift Template, as DeploymentConfig/Template API is not present")
 	}
 
 	if err = (&argocd.ReconcileArgoCD{
-		Client:        mgr.GetClient(),
-		Scheme:        mgr.GetScheme(),
-		LabelSelector: labelSelectorFlag,
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ArgoCD")
 		os.Exit(1)
@@ -258,13 +221,6 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ArgoCDExport")
-		os.Exit(1)
-	}
-	if err = (&notificationsConfig.NotificationsConfigurationReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NotificationsConfiguration")
 		os.Exit(1)
 	}
 
