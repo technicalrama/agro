@@ -829,6 +829,9 @@ type ArgoCDSpec struct {
 
 	// DefaultClusterScopedRoleDisabled will disable creation of default ClusterRoles for a cluster scoped instance.
 	DefaultClusterScopedRoleDisabled bool `json:"defaultClusterScopedRoleDisabled,omitempty"`
+
+	// AggregatedClusterRolesEnabled will allow users to have aggregated ClusterRoles for a cluster scoped instance.
+	AggregatedClusterRolesEnabled bool `json:"aggregatedClusterRolesEnabled,omitempty"`
 }
 
 // ArgoCDStatus defines the observed state of ArgoCD
