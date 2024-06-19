@@ -21,23 +21,23 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	argoprojv1alpha1 "github.com/argoproj-labs/argocd-operator/api/v1alpha1"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logr "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	argoproj "github.com/argoproj-labs/argocd-operator/api/v1alpha1"
 )
 
 var log = logr.Log.WithName("controller_argocdexport")
 
-// blank assignment to verify that ReconcileArgoCDExport implements reconcile.Reconciler
-var _ reconcile.Reconciler = &ReconcileArgoCDExport{}
+// blank assignment to verify that ArgoCDExportReconciler implements reconcile.Reconciler
+var _ reconcile.Reconciler = &ArgoCDExportReconciler{}
 
-// ReconcileArgoCDExport reconciles a ArgoCDExport object
+// ArgoCDExportReconciler reconciles a ArgoCDExport object
 // TODO(update) rename to ArgoCDExportReconciler
-type ReconcileArgoCDExport struct {
+type ArgoCDExportReconciler struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
 	Client client.Client
@@ -51,12 +51,12 @@ type ReconcileArgoCDExport struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.9.2/pkg/reconcile
-func (r *ReconcileArgoCDExport) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
+func (r *ArgoCDExportReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	reqLogger := logr.FromContext(ctx, "Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling ArgoCDExport")
 
 	// Fetch the ArgoCDExport instance
-	export := &argoproj.ArgoCDExport{}
+	export := &argoprojv1alpha1.ArgoCDExport{}
 	err := r.Client.Get(ctx, request.NamespacedName, export)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -78,7 +78,7 @@ func (r *ReconcileArgoCDExport) Reconcile(ctx context.Context, request ctrl.Requ
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ReconcileArgoCDExport) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ArgoCDExportReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	bld := ctrl.NewControllerManagedBy(mgr)
 	setResourceWatches(bld)
 	return bld.Complete(r)

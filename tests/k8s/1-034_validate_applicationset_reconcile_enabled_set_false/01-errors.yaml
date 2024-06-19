@@ -1,0 +1,22 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-test-redis
+  namespace: test034
+  
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-test-repo-server
+  namespace: test034
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-test-server
+  namespace: test034
+
+

@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.19 as builder
+FROM golang:1.21 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -14,6 +14,7 @@ COPY main.go main.go
 COPY api/ api/
 COPY common/ common/
 COPY controllers/ controllers/
+COPY pkg/ pkg/
 COPY version/ version/
 
 # Build
@@ -25,9 +26,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="$LD_FLAGS" -a -o manager main.go
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
-
-# install grafana artifacts
-COPY grafana /var/lib/grafana
 
 # install redis artifacts
 COPY build/redis /var/lib/redis

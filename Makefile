@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.8.0
+VERSION ?= 0.9.0
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -96,7 +96,7 @@ build: generate fmt vet ## Build manager binary.
 	go build -ldflags=$(LD_FLAGS) -o bin/manager main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
-	REDIS_CONFIG_PATH="build/redis" GRAFANA_CONFIG_PATH="grafana" go run -ldflags=$(LD_FLAGS) ./main.go
+	REDIS_CONFIG_PATH="build/redis" go run -ldflags=$(LD_FLAGS) ./main.go
 
 docker-build: test ## Build docker image with the manager.
 	docker build --build-arg LD_FLAGS=$(LD_FLAGS) -t ${IMG} .

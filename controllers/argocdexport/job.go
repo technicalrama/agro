@@ -26,14 +26,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	argoproj "github.com/argoproj-labs/argocd-operator/api/v1alpha1"
+	argoprojv1alpha1 "github.com/argoproj-labs/argocd-operator/api/v1alpha1"
+	argoproj "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 	"github.com/argoproj-labs/argocd-operator/common"
-	"github.com/argoproj-labs/argocd-operator/controllers/argocd"
-	"github.com/argoproj-labs/argocd-operator/controllers/argoutil"
+	"github.com/argoproj-labs/argocd-operator/pkg/argoutil"
+	"github.com/argoproj-labs/argocd-operator/pkg/util"
 )
 
 // getArgoExportCommand will return the command for the ArgoCD export process.
-func getArgoExportCommand(cr *argoproj.ArgoCDExport) []string {
+func getArgoExportCommand(cr *argoprojv1alpha1.ArgoCDExport) []string {
 	cmd := make([]string, 0)
 	cmd = append(cmd, "uid_entrypoint.sh")
 	cmd = append(cmd, "argocd-operator-util")
@@ -42,7 +43,7 @@ func getArgoExportCommand(cr *argoproj.ArgoCDExport) []string {
 	return cmd
 }
 
-func getArgoExportContainerEnv(cr *argoproj.ArgoCDExport) []corev1.EnvVar {
+func getArgoExportContainerEnv(cr *argoprojv1alpha1.ArgoCDExport) []corev1.EnvVar {
 	env := make([]corev1.EnvVar, 0)
 
 	switch cr.Spec.Storage.Backend {
@@ -52,7 +53,7 @@ func getArgoExportContainerEnv(cr *argoproj.ArgoCDExport) []corev1.EnvVar {
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: argoutil.FetchStorageSecretName(cr),
+						Name: FetchStorageSecretName(cr),
 					},
 					Key: "aws.access.key.id",
 				},
@@ -64,7 +65,7 @@ func getArgoExportContainerEnv(cr *argoproj.ArgoCDExport) []corev1.EnvVar {
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: argoutil.FetchStorageSecretName(cr),
+						Name: FetchStorageSecretName(cr),
 					},
 					Key: "aws.secret.access.key",
 				},
@@ -76,7 +77,7 @@ func getArgoExportContainerEnv(cr *argoproj.ArgoCDExport) []corev1.EnvVar {
 }
 
 // getArgoExportContainerImage will return the container image for ArgoCD.
-func getArgoExportContainerImage(cr *argoproj.ArgoCDExport) string {
+func getArgoExportContainerImage(cr *argoprojv1alpha1.ArgoCDExport) string {
 	img := cr.Spec.Image
 	if len(img) <= 0 {
 		img = common.ArgoCDDefaultExportJobImage
@@ -87,7 +88,7 @@ func getArgoExportContainerImage(cr *argoproj.ArgoCDExport) string {
 		tag = common.ArgoCDDefaultExportJobVersion
 	}
 
-	return argoutil.CombineImageTag(img, tag)
+	return util.CombineImageTag(img, tag)
 }
 
 // getArgoExportVolumeMounts will return the VolumneMounts for the given ArgoCDExport.
@@ -108,14 +109,14 @@ func getArgoExportVolumeMounts() []corev1.VolumeMount {
 }
 
 // getArgoSecretVolume will return the Secret Volume for the export process.
-func getArgoSecretVolume(name string, cr *argoproj.ArgoCDExport) corev1.Volume {
+func getArgoSecretVolume(name string, cr *argoprojv1alpha1.ArgoCDExport) corev1.Volume {
 	volume := corev1.Volume{
 		Name: name,
 	}
 
 	volume.VolumeSource = corev1.VolumeSource{
 		Secret: &corev1.SecretVolumeSource{
-			SecretName: argoutil.FetchStorageSecretName(cr),
+			SecretName: FetchStorageSecretName(cr),
 		},
 	}
 
@@ -123,7 +124,7 @@ func getArgoSecretVolume(name string, cr *argoproj.ArgoCDExport) corev1.Volume {
 }
 
 // getArgoStorageVolume will return the storage Volume for the export process.
-func getArgoStorageVolume(name string, cr *argoproj.ArgoCDExport) corev1.Volume {
+func getArgoStorageVolume(name string, cr *argoprojv1alpha1.ArgoCDExport) corev1.Volume {
 	volume := corev1.Volume{
 		Name: name,
 	}
@@ -144,7 +145,7 @@ func getArgoStorageVolume(name string, cr *argoproj.ArgoCDExport) corev1.Volume 
 }
 
 // newJob returns a new Job instance for the given ArgoCDExport.
-func newJob(cr *argoproj.ArgoCDExport) *batchv1.Job {
+func newJob(cr *argoprojv1alpha1.ArgoCDExport) *batchv1.Job {
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Name,
@@ -155,7 +156,7 @@ func newJob(cr *argoproj.ArgoCDExport) *batchv1.Job {
 }
 
 // newCronJob returns a new CronJob instance for the given ArgoCDExport.
-func newCronJob(cr *argoproj.ArgoCDExport) *batchv1.CronJob {
+func newCronJob(cr *argoprojv1alpha1.ArgoCDExport) *batchv1.CronJob {
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Name,
@@ -165,12 +166,8 @@ func newCronJob(cr *argoproj.ArgoCDExport) *batchv1.CronJob {
 	}
 }
 
-func newExportPodSpec(cr *argoproj.ArgoCDExport, argocdName string, client client.Client) corev1.PodSpec {
+func newExportPodSpec(cr *argoprojv1alpha1.ArgoCDExport, argocdName string, client client.Client) corev1.PodSpec {
 	pod := corev1.PodSpec{}
-
-	boolPtr := func(value bool) *bool {
-		return &value
-	}
 
 	pod.Containers = []corev1.Container{{
 		Command:         getArgoExportCommand(cr),
@@ -179,13 +176,13 @@ func newExportPodSpec(cr *argoproj.ArgoCDExport, argocdName string, client clien
 		ImagePullPolicy: corev1.PullAlways,
 		Name:            "argocd-export",
 		SecurityContext: &corev1.SecurityContext{
-			AllowPrivilegeEscalation: boolPtr(false),
+			AllowPrivilegeEscalation: util.BoolPtr(false),
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{
 					"ALL",
 				},
 			},
-			RunAsNonRoot: boolPtr(true),
+			RunAsNonRoot: util.BoolPtr(true),
 		},
 		VolumeMounts: getArgoExportVolumeMounts(),
 	}}
@@ -205,12 +202,15 @@ func newExportPodSpec(cr *argoproj.ArgoCDExport, argocdName string, client clien
 		RunAsGroup: &id,
 		FSGroup:    &id,
 	}
-	argocd.AddSeccompProfileForOpenShift(client, &pod)
+
+	// TO DO: move this function to mutation package
+
+	// argocd.AddSeccompProfileForOpenShift(client, &pod)
 
 	return pod
 }
 
-func newPodTemplateSpec(cr *argoproj.ArgoCDExport, argocdName string, client client.Client) corev1.PodTemplateSpec {
+func newPodTemplateSpec(cr *argoprojv1alpha1.ArgoCDExport, argocdName string, client client.Client) corev1.PodTemplateSpec {
 	return corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Name,
@@ -222,7 +222,7 @@ func newPodTemplateSpec(cr *argoproj.ArgoCDExport, argocdName string, client cli
 }
 
 // reconcileCronJob will ensure that the CronJob for the ArgoCDExport is present.
-func (r *ReconcileArgoCDExport) reconcileCronJob(cr *argoproj.ArgoCDExport) error {
+func (r *ArgoCDExportReconciler) reconcileCronJob(cr *argoprojv1alpha1.ArgoCDExport) error {
 	if cr.Spec.Storage == nil {
 		return nil // Do nothing if storage options not set
 	}
@@ -257,7 +257,7 @@ func (r *ReconcileArgoCDExport) reconcileCronJob(cr *argoproj.ArgoCDExport) erro
 }
 
 // reconcileJob will ensure that the Job for the ArgoCDExport is present.
-func (r *ReconcileArgoCDExport) reconcileJob(cr *argoproj.ArgoCDExport) error {
+func (r *ArgoCDExportReconciler) reconcileJob(cr *argoprojv1alpha1.ArgoCDExport) error {
 	if cr.Spec.Storage == nil {
 		return nil // Do nothing if storage options not set
 	}
@@ -287,13 +287,13 @@ func (r *ReconcileArgoCDExport) reconcileJob(cr *argoproj.ArgoCDExport) error {
 	return r.Client.Create(context.TODO(), job)
 }
 
-func (r *ReconcileArgoCDExport) argocdName(namespace string) (string, error) {
+func (r *ArgoCDExportReconciler) argocdName(namespace string) (string, error) {
 	argocds := &argoproj.ArgoCDList{}
 	if err := r.Client.List(context.TODO(), argocds, &client.ListOptions{Namespace: namespace}); err != nil {
 		return "", err
 	}
 	if len(argocds.Items) != 1 {
-		return "", fmt.Errorf("No Argo CD instance found in namespace %s", namespace)
+		return "", fmt.Errorf("no Argo CD instance found in namespace %s", namespace)
 	}
 	argocd := argocds.Items[0]
 	return argocd.Name, nil

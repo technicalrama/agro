@@ -71,7 +71,7 @@ The operator will create these ConfigMaps for the cluster and set the initial va
 ### Secrets
 
 There is a Secret that is used by Argo CD named `argocd-secret`. The `argocd-server` component reads this secret to
-obtain the admin password for authentication.
+obtain the admin password for authentication. NOTE: Upon initial deployment, the initial password for the `admin` user is stored in the `argocd-cluster` secret instead.
 
 This Secret is managed by the operator and should not be changed directly.
 
@@ -89,7 +89,7 @@ secret/example-argocd-cluster                      Opaque                       
 secret/example-argocd-tls                          kubernetes.io/tls                     2      33s
 ```
 
-The cluster Secret contains the admin password for authenticating with Argo CD, as well as the Grafana dashboard, if enabled.
+The cluster Secret contains the admin password for authenticating with Argo CD.
 
 ```bash
 apiVersion: v1
@@ -107,7 +107,7 @@ type: Opaque
 ```
 
 The operator will watch for changes to the `admin.password` value. When a change is made the password is synchronized to
-Argo CD and Grafana automatically.
+Argo CD automatically.
 
 Fetch the admin password from the cluster Secret.
 

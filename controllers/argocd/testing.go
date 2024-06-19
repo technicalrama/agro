@@ -15,13 +15,9 @@
 package argocd
 
 import (
-	"context"
-	"sort"
 	"testing"
 
 	"github.com/go-logr/logr"
-
-	"github.com/argoproj-labs/argocd-operator/common"
 
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
@@ -29,16 +25,14 @@ import (
 	v1 "k8s.io/api/rbac/v1"
 	resourcev1 "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/argoproj-labs/argocd-operator/controllers/argoutil"
+	"github.com/argoproj-labs/argocd-operator/pkg/argoutil"
 
-	argoprojv1alpha1 "github.com/argoproj-labs/argocd-operator/api/v1alpha1"
 	argoproj "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 )
+
+type argoCDOpt func(*argoproj.ArgoCD)
 
 const (
 	testNamespace             = "argocd"
@@ -48,33 +42,6 @@ const (
 
 func ZapLogger(development bool) logr.Logger {
 	return zap.New(zap.UseDevMode(development))
-}
-
-func makeTestReconciler(t *testing.T, objs ...runtime.Object) *ReconcileArgoCD {
-	s := scheme.Scheme
-	assert.NoError(t, argoproj.AddToScheme(s))
-	assert.NoError(t, argoprojv1alpha1.AddToScheme(s))
-
-	cl := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...).Build()
-	return &ReconcileArgoCD{
-		Client: cl,
-		Scheme: s,
-	}
-}
-
-type argoCDOpt func(*argoproj.ArgoCD)
-
-func makeTestArgoCD(opts ...argoCDOpt) *argoproj.ArgoCD {
-	a := &argoproj.ArgoCD{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testArgoCDName,
-			Namespace: testNamespace,
-		},
-	}
-	for _, o := range opts {
-		o(a)
-	}
-	return a
 }
 
 func makeTestArgoCDForKeycloak() *argoproj.ArgoCD {
@@ -196,15 +163,6 @@ func initialCerts(t *testing.T, host string) argoCDOpt {
 	}
 }
 
-func stringMapKeys(m map[string]string) []string {
-	r := []string{}
-	for k := range m {
-		r = append(r, k)
-	}
-	sort.Strings(r)
-	return r
-}
-
 func makeTestControllerResources() *corev1.ResourceRequirements {
 	return &corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
@@ -255,45 +213,4 @@ func makeTestDexResources() *corev1.ResourceRequirements {
 			corev1.ResourceCPU:    resourcev1.MustParse("500m"),
 		},
 	}
-}
-
-func createNamespace(r *ReconcileArgoCD, n string, managedBy string) error {
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: n}}
-	if managedBy != "" {
-		ns.Labels = map[string]string{common.ArgoCDManagedByLabel: managedBy}
-	}
-
-	if r.ManagedNamespaces == nil {
-		r.ManagedNamespaces = &corev1.NamespaceList{}
-	}
-	r.ManagedNamespaces.Items = append(r.ManagedNamespaces.Items, *ns)
-
-	return r.Client.Create(context.TODO(), ns)
-}
-
-func createNamespaceManagedByClusterArgoCDLabel(r *ReconcileArgoCD, n string, managedBy string) error {
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: n}}
-	if managedBy != "" {
-		ns.Labels = map[string]string{common.ArgoCDManagedByClusterArgoCDLabel: managedBy}
-	}
-
-	if r.ManagedSourceNamespaces == nil {
-		r.ManagedSourceNamespaces = make(map[string]string)
-	}
-	r.ManagedSourceNamespaces[ns.Name] = ""
-
-	return r.Client.Create(context.TODO(), ns)
-}
-
-func merge(base map[string]string, diff map[string]string) map[string]string {
-	result := make(map[string]string)
-
-	for k, v := range base {
-		result[k] = v
-	}
-	for k, v := range diff {
-		result[k] = v
-	}
-
-	return result
 }

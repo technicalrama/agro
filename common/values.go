@@ -16,24 +16,10 @@ package common
 
 import "time"
 
+// Argo CD values
 const (
-	// ArgoCDAppName is the application name for labels.
-	ArgoCDAppName = "argocd"
-
-	// ArgoCDCASuffix is the name suffix for ArgoCD CA resources.
-	ArgoCDCASuffix = "ca"
-
-	// ArgoCDConfigMapName is the upstream hard-coded ArgoCD ConfigMap name.
-	ArgoCDConfigMapName = "argocd-cm"
-
-	// ArgoCDGPGKeysConfigMapName is the upstream hard-coded ArgoCD gpg-keys ConfigMap name.
-	ArgoCDGPGKeysConfigMapName = "argocd-gpg-keys-cm"
-
 	// ArgoCDDuration365Days is a duration representing 365 days.
 	ArgoCDDuration365Days = time.Hour * 24 * 365
-
-	// ArgoCDExportName is the export name for labels.
-	ArgoCDExportName = "argocd.export"
 
 	// ArgoCDExportStorageBackendAWS is the value for the AWS storage backend.
 	ArgoCDExportStorageBackendAWS = "aws"
@@ -47,48 +33,83 @@ const (
 	// ArgoCDExportStorageBackendLocal is the value for the local storage backend.
 	ArgoCDExportStorageBackendLocal = "local"
 
-	// ArgoCDGrafanaConfigMapSuffix is the default suffix for the Grafana configuration ConfigMap.
-	ArgoCDGrafanaConfigMapSuffix = "grafana-config"
-
-	// ArgoCDGrafanaDashboardConfigMapSuffix is the default suffix for the Grafana dashboards ConfigMap.
-	ArgoCDGrafanaDashboardConfigMapSuffix = "grafana-dashboards"
-
-	// ArgoCDKnownHostsConfigMapName is the upstream hard-coded SSH known hosts data ConfigMap name.
-	ArgoCDKnownHostsConfigMapName = "argocd-ssh-known-hosts-cm"
-
-	// ArgoCDRedisHAConfigMapName is the upstream ArgoCD Redis HA ConfigMap name.
-	ArgoCDRedisHAConfigMapName = "argocd-redis-ha-configmap"
-
-	// ArgoCDRedisHAHealthConfigMapName is the upstream ArgoCD Redis HA Health ConfigMap name.
-	ArgoCDRedisHAHealthConfigMapName = "argocd-redis-ha-health-configmap"
-
-	// ArgoCDRedisProbesConfigMapName is the upstream ArgoCD Redis Probes ConfigMap name.
-	ArgoCDRedisProbesConfigMapName = "argocd-redis-ha-probes"
-
-	// ArgoCDRBACConfigMapName is the upstream hard-coded RBAC ConfigMap name.
-	ArgoCDRBACConfigMapName = "argocd-rbac-cm"
-
-	// ArgoCDSecretName is the upstream hard-coded ArgoCD Secret name.
-	ArgoCDSecretName = "argocd-secret"
-
 	// ArgoCDStatusCompleted is the completed status value.
 	ArgoCDStatusCompleted = "Completed"
 
-	// ArgoCDTLSCertsConfigMapName is the upstream hard-coded TLS certificate data ConfigMap name.
-	ArgoCDTLSCertsConfigMapName = "argocd-tls-certs-cm"
+	// K8sOSLinux is the value for kubernetes.io/os key for linux pods
+	K8sOSLinux = "linux"
 
-	// ArgoCDAppSetGitlabSCMTLSCertsConfigMapName is the hard-coded ApplicationSet Gitlab SCM TLS certificate data ConfigMap name.
-	ArgoCDAppSetGitlabSCMTLSCertsConfigMapName = "argocd-appset-gitlab-scm-tls-certs-cm"
+	// ArgoCDRedisServerTLS is the redis server tls value.
+	ArgoCDRedisServerTLS = "argocd-operator-redis-tls"
 
-	// ArgoCDRedisServerTLSSecretName is the name of the TLS secret for the redis-server
-	ArgoCDRedisServerTLSSecretName = "argocd-operator-redis-tls"
+	// ArgoCDMetrics is the resource metrics key for labels.
+	ArgoCDMetrics = "metrics"
 
-	// ArgoCDRepoServerTLSSecretName is the name of the TLS secret for the repo-server
-	ArgoCDRepoServerTLSSecretName = "argocd-repo-server-tls"
+	ArgoCDStatusUnknown = "Unknown"
 
-	// ArgoCDServerTLSSecretName is the name of the TLS secret for the argocd-server
-	ArgoCDServerTLSSecretName = "argocd-server-tls"
+	ArgoCDStatusUnavailable = "Unavailable"
 
-	//ApplicationSetServiceNameSuffix is the suffix for Apllication Set Controller Service
-	ApplicationSetServiceNameSuffix = "applicationset-controller"
+	ArgoCDStatusPending = "Pending"
+
+	ArgoCDStatusRunning = "Running"
+
+	ArgoCDStatusFailed = "Failed"
+
+	ArgoCDStatusAvailable = "Available"
+
+	PrometheusOperator = "prometheus-operator"
+
+	ArgoCDSecretTypeCluster = "cluster"
+
+	// ArgoCDRBACTypeAppSetManagement is the value used when an rbac resource is targeted for applicatonset management
+	ArgoCDRBACTypeAppSetManagement = "appset-management"
+
+	// ArgoCDRBACTypeAppManagement is the value used when an rbac resource is targeted for applicaton management
+	ArgoCDRBACTypeAppManagement = "app-management"
+
+	// ArgoCDRBACTypeAppManagement is the value used when an rbac resource is targeted for resource management
+	ArgoCDRBACTypeResourceMananagement = "resource-management"
+)
+
+// general values
+const (
+	TimeFormatMST                = "01022006-150406-MST"
+	TLSCerts                     = "tls-certs"
+	CapabilityDropAll            = "ALL"
+	VolumeMountPathTLS           = "/app/config/tls"
+	VolumeMountPathRepoServerTLS = "/app/config/reposerver/tls"
+	WorkingDirApp                = "/app"
+	Webhook                      = "webhook"
+	SSHKnownHosts                = "ssh-known-hosts"
+	VolumeMountPathSSH           = "/app/config/ssh"
+	GPGKeys                      = "gpg-keys"
+	VolumeMountPathGPG           = "/app/config/gpg/source"
+	GPGKeyRing                   = "gpg-keyring"
+	VolumeMountPathGPGKeyring    = "/app/config/gpg/keys"
+	VolumeTmp                    = "tmp"
+	VolumeMountPathTmp           = "/tmp"
+)
+
+// API group versions and resource kinds
+const (
+	APIVersionV1          = "v1"
+	APIGroupVersionAppsV1 = "apps/v1"
+	APIGroupVersionRbacV1 = "rbac.authorization.k8s.io/v1"
+
+	DeploymentKind     = "Deployment"
+	RoleKind           = "Role"
+	RoleBindingKind    = "RoleBinding"
+	ConfigMapKind      = "ConfigMap"
+	SecretKind         = "Secret"
+	ServiceKind        = "Service"
+	ServiceAccountKind = "ServiceAccount"
+	ArgoCDKind         = "ArgoCD"
+	ClusterRoleKind    = "ClusterRole"
+)
+
+// Commnds
+const (
+	LogLevelCmd     = "--loglevel"
+	LogFormatCmd    = "--logformat"
+	UidEntryPointSh = "uid_entrypoint.sh"
 )
