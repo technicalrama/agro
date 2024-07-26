@@ -1,5 +1,5 @@
 # Argo CD v2.11.2
-FROM quay.io/argoproj/argocd@sha256:d2c274ff26c7ab164907de05826bdfe2e6f326af70edd0bb83194b75fbb71f9e as argocd
+FROM quay.io/argoproj/argocd@sha256:46c55d40a84b7958242cd04dd2fd857fc9f72b7fec7572a075b21f5db4e648a7 as argocd
 
 # Final Image
 FROM docker.io/library/ubuntu:24.04
